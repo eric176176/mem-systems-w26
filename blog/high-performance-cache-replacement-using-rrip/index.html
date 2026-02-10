@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>CS&#x2F;ECE 4&#x2F;599: High Performance Cache Replacement Using Re-Reference Interval Prediction (RRIP)</title>
+
+  <link href="https://khale.github.io/mem-systems-w26/main.css" rel="stylesheet">
+  <link rel="alternate" type="application/rss+xml" href="https://khale.github.io/mem-systems-w26/rss.xml">
+  <link rel="icon" href="https://khale.github.io/mem-systems-w26/img/favicon.ico">
+  <link rel="apple-touch-icon-precomposed" href="https://khale.github.io/mem-systems-w26/img/favicon152.png">
+  
+<meta name="twitter:card" content="summary">
+<meta property="og:type" content="article">
+<meta property="og:title" content="High Performance Cache Replacement Using Re-Reference Interval Prediction (RRIP)">
+<meta property="og:description"
+    content="Introduction
+Cache replacement policies play a central role in determining the effectiveness of modern cache hierarchies. Despite decades of architectural evolution, the dominant policy remains Least Recently Used (LRU), largely due to its intuitive appeal and historical simplicity. However, LRU operates off the assumption that recent access implies near-future reuse. While often true, this assumption fails for a wide range of contemporary workloads, including streaming applications, large working sets, and multiprogrammed environments where interference dominates cache behavior.
+The paper High Performance Cache Replacement Using Re-reference Interval Prediction (RRIP) introduces RRIP as an alternative replacment policy to LRU. Rather than estimating reuse indirectly through recency, RRIP explicitly predicts how far in the future a cache block will be referenced again. This alternative prediction method enables replacement decisions that more closely approximate optimal behavior, while still remaining implementable in real hardware.
+Background and Motivation
+Limitations of LRU
+LRU assumes that recently accessed data will be reused in the near future. This assumption breaks down in several common scenarios:">
+
+
+</head>
+<body >
+  <header>
+    <nav>
+      <h1>
+          <a href="https://khale.github.io/mem-systems-w26">CS&#x2F;ECE 4&#x2F;599</a>
+      </h1>
+      
+      
+      
+      <p><a href="https://khale.github.io/mem-systems-w26/schedule/">
+        Schedule
+      </a></p>
+      
+      
+      
+      <p><a href="https://khale.github.io/mem-systems-w26/project-ideas/">
+        Project Ideas
+      </a></p>
+      
+      
+      
+      <p><a href="https://khale.github.io/mem-systems-w26/syllabus/">
+        Syllabus
+      </a></p>
+      
+      
+      
+      <p><a href="https://khale.github.io/mem-systems-w26/extra-reading/">
+        Extra Resources
+      </a></p>
+      
+      
+      
+      <p><a href="https:&#x2F;&#x2F;khale.github.io&#x2F;mem-systems-w26&#x2F;lesson&#x2F;">
+        Lessons
+      </a></p>
+      
+      <p><a href="https://github.com/khale/mem-systems-w26/discussions">Discussions</a></p>
+      
+      
+      <p><a href="https:&#x2F;&#x2F;khale.github.io&#x2F;mem-systems-w26&#x2F;blog&#x2F;">
+        Blog
+      </a></p>
+    </nav>
+  </header>
+  <main>
+    
+
+
+<h1>
+    <a href="https:&#x2F;&#x2F;khale.github.io&#x2F;mem-systems-w26&#x2F;blog&#x2F;">
+    The CS&#x2F;ECE 4&#x2F;599 Course Blog
+    </a>
+</h1>
+<article>
+  <h1>High Performance Cache Replacement Using Re-Reference Interval Prediction (RRIP)</h1>
+  <p class="details">
+    
+      <span class="author"> by
+      
+        Thomas Pinon (Leader &#x2F; Presentor),
+      
+        Eric Morgan (scribe),
+      
+        James S. Tappert (blogger)
+      
+      <span>
+    
+    <time datetime="2026-01-27">
+      January 27, 2026
+    </time>
+  </p>
+  <h2 id="introduction">Introduction</h2>
+<p>Cache replacement policies play a central role in determining the effectiveness of modern cache hierarchies. Despite decades of architectural evolution, the dominant policy remains Least Recently Used (LRU), largely due to its intuitive appeal and historical simplicity. However, LRU operates off the assumption that recent access implies near-future reuse. While often true, this assumption fails for a wide range of contemporary workloads, including streaming applications, large working sets, and multiprogrammed environments where interference dominates cache behavior.</p>
+<p>The paper <em>High Performance Cache Replacement Using Re-reference Interval Prediction (RRIP)</em> introduces RRIP as an alternative replacment policy to LRU. Rather than estimating reuse indirectly through recency, RRIP explicitly predicts how far in the future a cache block will be referenced again. This alternative prediction method enables replacement decisions that more closely approximate optimal behavior, while still remaining implementable in real hardware.</p>
+<h2 id="background-and-motivation">Background and Motivation</h2>
+<h3 id="limitations-of-lru">Limitations of LRU</h3>
+<p>LRU assumes that recently accessed data will be reused in the near future. This assumption breaks down in several common scenarios:</p>
+<ul>
+<li><strong>Streaming workloads</strong>, where data is accessed once and never reused</li>
+<li><strong>Large working sets</strong> that exceed cache capacity, leading to thrashing</li>
+<li><strong>Mixed access patterns</strong>, where frequently reused data structures coexist with large scans</li>
+</ul>
+<p>In such cases, LRU allows non-temporal data to evict frequently reused cache blocks, significantly degrading performance.</p>
+<h2 id="key-concepts-and-terminology">Key Concepts and Terminology</h2>
+<ul>
+<li><strong>Re-reference Interval Prediction (RRIP):</strong> A cache replacement framework that predicts how long it will be before a cache block is reused, rather than relying solely on recency.</li>
+<li><strong>Re-reference Prediction Value (RRPV):</strong> A small per-cache-line counter that encodes the predicted distance to the next reuse. Larger values indicate farther reuse.</li>
+<li><strong>Static RRIP (SRRIP):</strong> A policy that inserts new cache lines with a long predicted re-reference interval, providing strong resistance to cache pollution from streaming accesses.</li>
+<li><strong>Bimodal RRIP (BRRIP):</strong> A variant that usually inserts cache lines with a very long re-reference interval but occasionally inserts them as likely-to-be-reused, improving performance under thrashing workloads.</li>
+<li><strong>Dynamic RRIP (DRRIP):</strong> A hybrid policy that dynamically selects between using SRRIP or BRIPP using Set Dueling.</li>
+<li><strong>Set Dueling:</strong> A technique that dedicates a small number of cache sets to competing policies and uses their miss behavior to select the most effective policy at runtime.</li>
+</ul>
+<h2 id="overview-of-the-rrip-mechanism">Overview of the RRIP Mechanism</h2>
+<p>RRIP associates each cache block with an RRPV counter that represents its predicted reuse distance. Conceptually:</p>
+<ul>
+<li><strong>RRPV = 0</strong> indicates an expected near-immediate reuse</li>
+<li><strong>RRPV = Max</strong> indicates reuse far in the future or no reuse at all</li>
+</ul>
+<h3 id="replacement-policy">Replacement Policy</h3>
+<p>On a cache miss:</p>
+<ol>
+<li>The cache searches for a block with the maximum RRPV.</li>
+<li>If no such block exists, all RRPVs are incremented until at least one reaches the maximum value.</li>
+<li>A block with the maximum RRPV is selected for eviction.</li>
+</ol>
+<p>On a cache hit:</p>
+<ul>
+<li>The accessed block’s RRPV is decremented, indicating high reuse potential.</li>
+</ul>
+<h3 id="scan-resistance-and-adaptivity">Scan Resistance and Adaptivity</h3>
+<p>SRRIP inserts new cache blocks with long predicted reuse distances, preventing streaming data from displacing frequently reused blocks. DRRIP extends this approach by dynamically choosing between SRRIP and BRRIP based on runtime behavior. Using set dueling, DRRIP adapts to workload characteristics without software intervention.</p>
+<h2 id="evaluation-and-results">Evaluation and Results</h2>
+<p>The authors evaluate RRIP across a wide range of single-core and multi-core workloads. Key findings include:</p>
+<ul>
+<li><strong>Performance Improvements</strong>
+<ul>
+<li>SRRIP achieves approximately 4–7% performance improvement over LRU</li>
+<li>DRRIP achieves approximately 9–10% improvement over LRU</li>
+</ul>
+</li>
+<li><strong>Hardware Overhead</strong>
+<ul>
+<li>Only 2 bits per cache block are required</li>
+<li>Lower complexity than LRU implementations</li>
+</ul>
+</li>
+<li><strong>Robustness</strong>
+<ul>
+<li>Strong resistance to cache pollution from scans</li>
+<li>Stable performance across diverse application behaviors</li>
+</ul>
+</li>
+<li><strong>Multicore Benefits</strong>
+<ul>
+<li>Reduced inter-core cache interference</li>
+<li>Improved overall throughput and fairness</li>
+</ul>
+</li>
+</ul>
+<p>These results demonstrate that RRIP provides consistent gains with minimal additional hardware cost.</p>
+<h2 id="strengths-and-limitations">Strengths and Limitations</h2>
+<h3 id="strengths">Strengths</h3>
+<ul>
+<li><strong>Conceptual Clarity:</strong> Explicitly modeling reuse distance aligns more closely with optimal replacement behavior than recency-based policies.</li>
+<li><strong>Low Implementation Cost:</strong> RRIP requires minimal state and simpler logic than LRU.</li>
+<li><strong>Adaptability:</strong> DRRIP dynamically adjusts to workload behavior without programmer or operating system involvement.</li>
+</ul>
+<h3 id="limitations">Limitations</h3>
+<ul>
+<li><strong>Predictive Approximation:</strong> RRPVs provide only a coarse approximation of reuse distance, especially with small counters, and irregular access patterns may still lead to poor predictions.</li>
+<li><strong>Evaluation Scope:</strong> Some highly pointer-intensive or unpredictable workloads are not extensively explored.</li>
+</ul>
+<h2 id="class-discussion">Class Discussion</h2>
+<ul>
+<li><strong>Where is the data going when it is not recently used? Is there demotion between levels of cache?:</strong>
+<ul>
+<li>Yes, when you kick something from the L1, it goes to the L2. Caches are generally inclusive.</li>
+</ul>
+</li>
+<li><strong>Why is this not implemented in higher levels of cache?:</strong>
+<ul>
+<li>Latency constraints and hardware overhead. More computational logic for finding near and far values.. Not much gain in efficiency.</li>
+</ul>
+</li>
+<li><strong>What eviction policy is used in L1?:</strong>
+<ul>
+<li>NRU is used. Only one bit and very fast.</li>
+</ul>
+</li>
+<li><strong>How often is L3 accessed in workloads such as gaming? Are the performance gains worth it?:"</strong>
+<ul>
+<li>Depends on the workload. The paper showed that performance increased in all benchmarks expect photoshop. Performance increases across the board seem to show L3 cache access. L3 is designed to minimize cache misses, so additional hardware is fine because latency is not an issue.</li>
+</ul>
+</li>
+<li><strong>What hardware was used to test this?</strong>
+<ul>
+<li>CNP-based x86 simulator, as well as games, and productivity apps.</li>
+</ul>
+</li>
+</ul>
+<h2 id="conclusion">Conclusion</h2>
+<p>The RRIP framework illustrates that cache replacement policies can be both simple and highly effective when they directly model reuse behavior. By predicting re-reference intervals instead of relying on recency, RRIP consistently outperforms traditional LRU while maintaining low hardware overhead. The success of DRRIP further demonstrates the importance of adaptive policies in handling modern, diverse workloads.</p>
+<h2 id="references">References</h2>
+<ul>
+<li>Jaleel, A., et al. <em>High Performance Cache Replacement Using Re-reference Interval Prediction</em> (https://dl.acm.org/doi/10.1145/1815961.1815971)</li>
+</ul>
+<h1 id="generative-ai-disclosure">Generative AI Disclosure</h1>
+<ul>
+<li>ChatGPT was used to generate a Markdown file template and check spelling and grammar.</li>
+<li>Generative AI can be useful tools for tasks such as summarizing or drafting, however, they may give innacurate information confidently and should always have generated information validated</li>
+</ul>
+
+  <footer>
+    
+    
+    
+    <p>This is the course blog for CS/ECE 4/599, a research-focused course on memory systems in the School of EECS at Oregon State.
+You can subscribe to <a rel="external" href="https://github.com/khale/mem-systems-w26/blog">posts on the blog</a> with <a rel="external" href="https://github.com/khale/mem-systems-w26/rss.xml">RSS</a>.</p>
+
+  </footer>
+</article>
+
+  </main>
+  <footer>
+    <p><a href="https://www.oregonstate.edu">Oregon State University</a>
+    &mdash;
+    <a href="https://engineering.oregonstate.edu/EECS">School of EECS</a></p>
+  </footer>
+</body>
+</html>

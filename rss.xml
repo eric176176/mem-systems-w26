@@ -1,0 +1,810 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
+    <channel>
+        <title>CS&#x2F;ECE 4&#x2F;599</title>
+        <link>https%3A//khale.github.io/mem-systems-w26/</link>
+        <description></description>
+        <generator>Zola</generator>
+        <language>en</language>
+        <atom:link href="https%3A//khale.github.io/mem-systems-w26/rss.xml" rel="self" type="application/rss+xml"/>
+        <icon>https%3A//khale.github.io/mem-systems-w26/img/favicon.ico</icon>
+        <lastBuildDate>Sat, 07 Feb 2026 00:00:00 +0000</lastBuildDate>
+        
+            <item>
+                <title>Flipping Bits in Memory Without Accessing Them</title>
+                <pubDate>Sat, 07 Feb 2026 00:00:00 +0000</pubDate>
+                <link>https%3A//khale.github.io/mem-systems-w26/blog/flippingbitsinmemorywithoutaccessingthem/</link>
+                <guid>https%3A//khale.github.io/mem-systems-w26/blog/flippingbitsinmemorywithoutaccessingthem/</guid>
+                <description>&lt;h1 id=&quot;introduction&quot;&gt;Introduction&lt;&#x2F;h1&gt;
+&lt;p&gt;First let us start with the physical structure of a DRAM. At the lowest level Dram is a two dimensional Grid of Cells and each Cell stores either 0 or 1. The cells are made of two components i) Capacitor - the one that holds the electrical charge ii) Access Transistor - these act as switches that lock&#x2F;release the charge in the capacitors.&lt;&#x2F;p&gt;
+&lt;h5 id=&quot;the-grid&quot;&gt;The Grid:&lt;&#x2F;h5&gt;
+&lt;ul&gt;
+&lt;li&gt;Wordline - A horizontal line connecting all the cells in a row&lt;&#x2F;li&gt;
+&lt;li&gt;Bitline  - A vertical line connecting all the cells in a column&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h5 id=&quot;the-access&quot;&gt;The Access:&lt;&#x2F;h5&gt;
+&lt;p&gt;Computer cannot access a single cell directly, it has to get an entire row of data first, and memory controller controls this process. To read a cell, the memory controller issues an activate command and this triggers(high voltage) the voltage of a specific wordline, which turns on all the access transistors of that row, connecting each capacitor to its corresponding bitline.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;but-before-we-go-further-we-need-to-understand-what-happens-when-dram-reads-first&quot;&gt;But before we go further we need to understand what happens when Dram reads first&lt;&#x2F;h2&gt;
+&lt;ul&gt;
+&lt;li&gt;Precharge - The memory keeps the bitline to Vdd&#x2F;2 (neutral position). Bitlines are seen as bigger capacitors than the cells.&lt;&#x2F;li&gt;
+&lt;li&gt;Activate - When the activate commands connects the cell capacitors to the bitlines, the cells share charge with the bitlines. As a result the bitline moves a tiny bit up&#x2F;down from vdd&#x2F;2 (as the cell capacitor charge is much smaller compared to the bitline charge).&lt;&#x2F;li&gt;
+&lt;li&gt;Sense Amplify - This tiny movement is noticed and amplified by this sense amplifier and it drives it hard towards the noticed direction too. That is tiny up becomes full 1 for bitline and tiny down becomes full 0.&lt;&#x2F;li&gt;
+&lt;li&gt;Restore - While it is amplifying the btiline it also starts restoring the cell capacitors to its original value or threshold value.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;Once the read is done, the row values are in the row buffer and cell values can be accessed quickly.&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Precharge again - Once the row is closed, bitline precharging starts again that is bringin to its Vdd&#x2F;2 level again for next row access.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h5 id=&quot;dram-refresh&quot;&gt;Dram Refresh:&lt;&#x2F;h5&gt;
+&lt;p&gt;Since the cells are capacitors, they tend to leak and lose charge overtime, so Dram needs to be refreshed (restoring its charge to is orginal or threshold value)&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;row-hammer-mechanism-and-error&quot;&gt;Row Hammer Mechanism and Error:&lt;&#x2F;h2&gt;
+&lt;p&gt;Now that we know how a Dram access happens, let us see what rowhammer error is. Memory chips are getting smaller and smaller and more cells are getting crammed up into smaller spaces, and because of this tight packaging, interference is happening (electromagnetic coupling). And also since the cells are getting smaller too for more density, they hold less charge therefore losing or leaking charge and going below threshold is easier.&lt;&#x2F;p&gt;
+&lt;p&gt;The Authors found out that if they access a row repeatedly which will mean toggling the voltage of the wordline on and off rapidly, it creates a electrical noise  and this noise causes the cell in the neighboring rows to leak charge much faster than normal. They will end up leaking and losing charge and going below the threshold before the DRAM gets refreshed, which means permanent loss of data or flips (1 to 0).&lt;&#x2F;p&gt;
+&lt;p&gt;The wrote a simple program to prove this happens on real Intel and AMD processors. It showed a simple user level program can induce flips by:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;generating loads that actually go to DRAM (not cache) and&lt;&#x2F;li&gt;
+&lt;li&gt;choosing addresses that force the memory controller to open&#x2F;close rows repeatedly&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;The key trick is evicting cache lines between accesses, so each read becomes a DRAM access. For making this happen they used an instruction called clflush (Cache Line Flush). They showed that alternately touching two addresses mapped to different rows in the same bank forces the controller into a pattern like open &amp;gt; row X &amp;gt; close &amp;gt; open row Y &amp;gt; close &amp;gt; repeat.&lt;&#x2F;p&gt;
+&lt;p&gt;They tested 129 DDR3 modules from 3 major manufacturers and 110 were found with this bit flipping error disturbance. All modules from 2012 to 2013 showed this problem but the older ones did not, which shows as technology got smaller this became worse.&lt;&#x2F;p&gt;
+&lt;h5 id=&quot;key-findings&quot;&gt;Key Findings:&lt;&#x2F;h5&gt;
+&lt;ul&gt;
+&lt;li&gt;Minimum activations to see an error - The paper mentioned as few as 139k row activations before a refresh were enough, which is scary small.&lt;&#x2F;li&gt;
+&lt;li&gt;Locality - The errors (bit flips) are usually concentrated in two rows (called the Victims) near the hammered row (called the aggressor). They also mentioned the density of vulnerable cells to be upto 1 in 1.7k cells.&lt;&#x2F;li&gt;
+&lt;li&gt;Faster Refresh -  Refreshing Dram fast enough can make the errors disappear as we already know why.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;This findings were alarming as memory is assigned to programs as pages. So one row might belong to the web browser(aggressor) and the row next to it might belong to the OS(victim) and by hammering the memory, a malicious website could flip bits in the OS memory and take control of the system.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;solution&quot;&gt;Solution:&lt;&#x2F;h2&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;ECC fix - This is not a complete fix, as Rowhammer can produce multiple bit flips in the same ECC word and ECC cannot repair multiple errors. It doesn&#x27;t stop the error, rather tries to flag&#x2F;repair it (some of it).&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;Frequent Refresh - This does solve the problem but it very power hungry. And also refreshing the whole memory is too slow.&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;The proposed solution -  PARA (Probabilistic Adjacent Row Activation)&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt; 	i) Every time the controller closes a row R it flips a biased coin with probability p (refresh)&lt;&#x2F;p&gt;
+&lt;p&gt; 	ii) If the coin hits, the controller refreshes on adjacent row (it could be R-1 or R+1, best is to do it alternatively)&lt;&#x2F;p&gt;
+&lt;p&gt; 	iii) If it misses, do nothing.&lt;&#x2F;p&gt;
+&lt;p&gt;Why PARA works - They chose p to be small but large enough so that the chance of no neighbour refresh during heavy hammering becomes almost 0. Let us say a program tries to hammer a row 139k times before the next default refresh, statistically the coin flip will hit at least once and an unofficial will happen at least once which prevents the error.&lt;&#x2F;p&gt;
+&lt;p&gt;This is cheap and very effective with very low failures.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;results&quot;&gt;Results:&lt;&#x2F;h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Nth - They first assume an attacker hammers an aggressor row just enough times with one refresh interval and they call this count Nth. They took Nth range between 139k-284k activations for being realistic.&lt;&#x2F;li&gt;
+&lt;li&gt;They took p=0.001 (smaller is better as less overhead), therefore for tow neighbour it will be  p&#x2F;2 = 0.0005&lt;&#x2F;li&gt;
+&lt;li&gt;According to their table if N = 50k, 100k, 200k, then PARA fails are given by  P(fail in one refresh interval) = (1−p&#x2F;2)^Nth and the results were (1.4 x 10^-11), (1.9 x 10^-22), (3.6 x 10^-44) respectively.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;So we can see that the faliure probabilities are very very tiny. They simulated 29 worklaods on a modeled system(4 GHz , dual cahnnel DDR 1600) and also assumed a row can have upti 10 neighbours as a result they increased the p five times to 0.005. The average throughput degradations were 0.197% and worst case was  0.745%. This shows how reliable PARA is and it also casues a very small performance impact.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;class-discussion&quot;&gt;Class discussion&lt;&#x2F;h2&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;Would a combination of charged and uncharged capacitors result in more errors&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Errors are more likely to be caused when we have uncharged capacitors in the proximity of charged capacitors rather than by the overall ratios&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;Could we catagorize data stochastically by amount of zeroes to prevent this form of error&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;overhead would be extremely costly, though it has potential to work&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;Vulnerabilities exist with rowhammer and arbitrary code injection into user machines&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h1 id=&quot;conclusion&quot;&gt;Conclusion&lt;&#x2F;h1&gt;
+&lt;p&gt;This work shows that Rowhammer is not just a theoretical error. It constitutes a real hardware-level reliability and security vulnerability emerging from an increase in DRAM density. By explaining the mechanism through which DRAM is accessed, the paper makes clear how repeated row activations can induce charge loss and cause bit fliips in neighboring rows. Among proposed mitigations for these issues, PARA stands out for being practical and having low-overhead, both reducing the error rate and making it less deterministic, and thus less exploitable. A key takeaway to these findings is that memory can no longer be treated as a prefectly reliable abstraction, future systems must take into account both hardware and software defenses to ensure both correctness and memory safety.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;references&quot;&gt;References&lt;&#x2F;h1&gt;
+&lt;p&gt;[1] Yoongu Kim, Ross Daly, Jeremie Kim, Chris Fallin, Ji Hye Lee, Donghyuk Lee, Chris Wilkerson, Konrad Lai, and Onur Mutlu. 2014. &quot;Flipping bits in memory without accessing them: an experimental study of DRAM disturbance errors&quot;. SIGARCH Comput. Archit. News 42, 3 (June 2014), 361–372. https:&#x2F;&#x2F;doi.org&#x2F;10.1145&#x2F;2678373.2665726&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;ai-disclosure&quot;&gt;AI Disclosure&lt;&#x2F;h2&gt;
+&lt;ul&gt;
+&lt;li&gt;Generative AI was used to aid in formatting for this blog post&lt;&#x2F;li&gt;
+&lt;li&gt;Generative AI can be useful tools for tasks such as summarizing or drafting, however, they may give inaccurate information confidently and should always have generated information validated&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+</description>
+            </item>
+        
+            <item>
+                <title>nuKSM: NUMA-aware Memory De-duplication on Multi-socket Servers</title>
+                <pubDate>Tue, 03 Feb 2026 00:00:00 +0000</pubDate>
+                <link>https%3A//khale.github.io/mem-systems-w26/blog/nuksm-numa-aware-memory-de-duplication-on-multi-socket-servers/</link>
+                <guid>https%3A//khale.github.io/mem-systems-w26/blog/nuksm-numa-aware-memory-de-duplication-on-multi-socket-servers/</guid>
+                <description>&lt;h1 id=&quot;introduction&quot;&gt;Introduction&lt;&#x2F;h1&gt;
+&lt;p&gt;Memory de-duplication is an important aspect of Linux’s Kernel memory management system. Where pages are being scanned in main memory for pages with duplicate content. When two pages are found with the same contents, one file will remain unchanged where the other file will be mapped to the same physical address. This releases or frees the extra physical pages to be allocated for other needs. When two virtual addresses share a physical address both pages are marked as “copy-on-write” where the kernel will remap the virtual address to have its own copy once the process has decided to write to the virtual address. This was implemented to run more virtual machines on a host by sharing memory between users and processes.&lt;&#x2F;p&gt;
+&lt;p&gt;This paper nuKSM: NUMA-aware Memory De-duplication on Multi-socket Servers” proposes a new way of memory deduplication by making “nuKSM” which is a NUMA “Non-uniform-memory-access” aware. The goal of this paper is to create a KSM implementation that equally spreads the “NUMA-tax” across all NUMA nodes. Instead of making an arbitrary decision of where to consolidate memory, the nuKSM makes a decision of which process to consolidate the data based on the priority of that node.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;background-and-motivation&quot;&gt;Background and Motivation&lt;&#x2F;h1&gt;
+&lt;p&gt;KSM is very good at what it is meant to do. It effectively can save memory through de-duplication in a cost-effective way. Where it struggles is on multi-core processes such as servers. This often will not work to the same extent on multi-socket processes because it is unaware of what CPU’s are close to what memory and the priority of each CPU comparative to others in a system. This leads to:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Cores have a higher workload to fetch memory and process it which causes high performance variation between CPU nodes.&lt;&#x2F;li&gt;
+&lt;li&gt;Subverting priority from high priority processes that may have high remote memory access.&lt;&#x2F;li&gt;
+&lt;li&gt;KSM provides no way of tuning the system to balance and appropriate where data goes and the hierarchy of multi-core processes.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;Overall this paper goes into detail about how these problems can be minimized by using a NUMA aware model. This can spread out where memory is being accessed. Memory accessed more frequently by a certain core will be placed in closer proximity to said core.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;concepts-and-definitions&quot;&gt;Concepts and Definitions&lt;&#x2F;h1&gt;
+&lt;ul&gt;
+&lt;li&gt;NUMA-Tax: Overhead cost or latency of a certain node trying to access remote memory.&lt;&#x2F;li&gt;
+&lt;li&gt;De-Duplication: Where two or more pages in virtual memory have the same data. They will be merged all sharing the same physical address.&lt;&#x2F;li&gt;
+&lt;li&gt;Snice Value: Positive integer between 1 and 41 where the lower the number is the higher priority of a certain process.&lt;&#x2F;li&gt;
+&lt;li&gt;nuShare(p): A number between 0 and 1 that captures the preference of the current process whose page is scanned. This is relative to all other pages being scanned for the same content that will be de-duplicated. The higher the value the more likely it is that the content of the page will be local to that process.&lt;&#x2F;li&gt;
+&lt;li&gt;Stable Tree: Already de-duplicated pages are stored here.&lt;&#x2F;li&gt;
+&lt;li&gt;Unstable Tree: All potential candidates (pages) that have not been de-duplicated between the two most recent scans are considered for de-duplication.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h1 id=&quot;implementation&quot;&gt;Implementation&lt;&#x2F;h1&gt;
+&lt;p&gt;The nuKSM has 3 main goals to achieve when implementing this on top of the already existing KSM in Linux kernel version 5.4.0:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;Addressing Performance Variability and Unfairness.&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Keeps a de-duplicated page on a NUMA node that is expected to access that page often.&lt;&#x2F;li&gt;
+&lt;li&gt;NUMA-Tax is paid when accessing a page on a remote node. This Tax is much smaller the more infrequently a node may access remote memory.&lt;&#x2F;li&gt;
+&lt;li&gt;Acts to evenly distribute this Tax among all nodes by checking the amount of times data is accessed by nodes and tries to distribute how much “Tax” each of them will pay in order to access said data.&lt;&#x2F;li&gt;
+&lt;li&gt;Requires knowledge of access frequency of pages to be de-duplicated. Uses accessed and referenced bits already available in the page reclamation algorithm in Linux.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;Priority Based Memory De-Duplication&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Creates a way to program priority for a virtual machine with a higher priority allowing for more access to local memory.&lt;&#x2F;li&gt;
+&lt;li&gt;nuShare equation used to calculate if a process should have more priority than all others that share the soon to be de-duplicated page.&lt;&#x2F;li&gt;
+&lt;li&gt;This value means the higher it is, the more likely it will be local to that process.&lt;&#x2F;li&gt;
+&lt;li&gt;Compared to a random number between 0 and 1 if nuShare is larger than this number, then the scanned page will be de-duplicated and local to said process.&lt;&#x2F;li&gt;
+&lt;li&gt;Makes it so the ratio of priority between processes converges (meaning that the ratios are reflected in the amount of pages being de-duplicated).&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;Enhancing Responsiveness&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Utilization of forests (many unstable and stable trees) instead of a single stable and unstable tree.&lt;&#x2F;li&gt;
+&lt;li&gt;The index of a page is found by a function of the checksum of that page (index = page_checksum(page) % number of trees).&lt;&#x2F;li&gt;
+&lt;li&gt;If pages index into different trees they will never be compared so this will reduce the amount of unnecessary page comparisons.&lt;&#x2F;li&gt;
+&lt;li&gt;This is scalable because the amount of trees reflects the amount of physical memory. If memory is doubled the amount of trees will be proportionally doubled to fit that amount of physical memory.&lt;&#x2F;li&gt;
+&lt;li&gt;Makes the average height of a tree stay the same which would limit tree traversal and then makes the amount of comparisons similar. This makes it scalable for many different systems with different memory sizes.&lt;&#x2F;li&gt;
+&lt;li&gt;One stable and one unstable tree will have around 100MiB each which balances cost and benefit of using a de-centralized forest.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h1 id=&quot;evaluation-and-results&quot;&gt;Evaluation and Results&lt;&#x2F;h1&gt;
+&lt;p&gt;The authors conducted a study on a dual-socket Intel Xeon Gold 6140 server with 18 cores and 192 GiB memory per socket. Base frequency for the processor is  3.2 GHz. Using Linux v5.4.0 with the kernel running Ubuntu18.04 guest OS. They extended the same kernel to test KSM vs nuKSM. Both of these operate at the same scan rate for pages (1K pages every 100ms). They executed VM on specific nodes VM-0 running on node-0 and executed instance-0 of the applications, VM1 would run on node-1 and executes instance-1. They then would test specific workloads and logged memory intensive micro-benchmarks that are specifically sensitive to NUMA.&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Two VMs running identical applications were placed on different nodes. KSM vs nuKSM performance difference ranged from 15% up to 46% for MySQL RandomAccess. Whereas the difference was negligible for nuKSM with a 4% variability with the same RandomAccess.&lt;&#x2F;li&gt;
+&lt;li&gt;To calculate fairness they took the minimum and maximum slowdown and divided it by the maximum slowdown between the two identical application instances.&lt;&#x2F;li&gt;
+&lt;li&gt;This produced a fairness value between 0 &amp;amp; 1, where values closer to 1 indicate more equal performance across VMs.&lt;&#x2F;li&gt;
+&lt;li&gt;Under KSM, fairness values dropped significantly for memory-intensive workloads, showing a large imbalance between identical applications.&lt;&#x2F;li&gt;
+&lt;li&gt;With nuKSM enabled, fairness values were consistently close to 1 across all tested benchmarks, indicating much more balanced execution.&lt;&#x2F;li&gt;
+&lt;li&gt;nuKSM achieved nearly the same amount of memory de-duplication as KSM.&lt;&#x2F;li&gt;
+&lt;li&gt;This demonstrates that nuKSM improves fairness without reducing memory savings or overall system throughput.&lt;&#x2F;li&gt;
+&lt;li&gt;Priority-based evaluations showed that nuKSM correctly placed a larger fraction of de-duplicated pages on the NUMA node of higher priority VMs.&lt;&#x2F;li&gt;
+&lt;li&gt;As a result, higher-priority workloads experienced fewer remote memory accesses and improved runtimes, avoiding priority subversion seen in KSM.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h1 id=&quot;strengths-and-weaknesses&quot;&gt;Strengths and Weaknesses:&lt;&#x2F;h1&gt;
+&lt;p&gt;Strengths:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;nuKSM provides a practical improvement over KSM by directly addressing NUMA-related performance variability rather than disabling de-duplication entirely.&lt;&#x2F;li&gt;
+&lt;li&gt;It reuses existing Linux kernel mechanisms, such as active and inactive page lists, which avoids adding expensive new tracking overhead.&lt;&#x2F;li&gt;
+&lt;li&gt;The priority-based de-duplication mechanism effectively prevents priority subversion and gives users control over where de-duplicated pages are placed.&lt;&#x2F;li&gt;
+&lt;li&gt;nuKSM maintains nearly identical memory savings and overall throughput compared to KSM while significantly improving fairness.&lt;&#x2F;li&gt;
+&lt;li&gt;The decentralized forest based design scales well to large-memory systems and improves responsiveness under heavy memory pressure.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;Weaknesses:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;nuKSM does not account for available memory capacity on individual NUMA nodes when making placement decisions.&lt;&#x2F;li&gt;
+&lt;li&gt;Modifying KSM at this level is complex and may be difficult to deploy or maintain in production systems.&lt;&#x2F;li&gt;
+&lt;li&gt;Many real-world servers disable KSM entirely due to unpredictability or because memory constraints are less critical today.&lt;&#x2F;li&gt;
+&lt;li&gt;The approach assumes traditional NUMA architectures and may not extend cleanly to emerging heterogeneous memory systems such as NVLink or RDMA-based memory.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h1 id=&quot;class-discussion&quot;&gt;Class Discussion&lt;&#x2F;h1&gt;
+&lt;ul&gt;
+&lt;li&gt;Does nuKSM have checks for how much memory is available on different NUMA nodes?
+&lt;ul&gt;
+&lt;li&gt;Not addressed, KSM will merge by default (last node accessed)&lt;&#x2F;li&gt;
+&lt;li&gt;nuKSM often not implemented due to low-level issues, often solved before needing nuKSM implementation&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;Servers often just disable KSM due to availability
+&lt;ul&gt;
+&lt;li&gt;Good to look into how much memory KSM saves over large periods of time&lt;&#x2F;li&gt;
+&lt;li&gt;Memory may not have been as cheap when paper was proposed&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;Modifying KSM may not be the best solution to solving the NUMA problem
+&lt;ul&gt;
+&lt;li&gt;Hard to implement KSM methods especially with increasing non-unified memory (NVLink, RDMA, etc.)&lt;&#x2F;li&gt;
+&lt;li&gt;Works under the assumption that memory capacity is needed&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h1 id=&quot;conclusion&quot;&gt;Conclusion&lt;&#x2F;h1&gt;
+&lt;p&gt;Overall, nuKSM demonstrates that memory de-duplication and NUMA management cannot be treated as independent systems on modern multi-socket servers. While KSM is effective at reducing memory usage, its NUMA-unaware design leads to unfair performance variability and priority subversion. nuKSM addresses these issues by making de-duplication decisions based on access frequency, priority, and scalability, resulting in more balanced performance without sacrificing memory savings. Although real-world adoption may be limited due to implementation complexity and changing hardware trends, the paper highlights an important systems lesson that optimizing one kernel subsystem in isolation can create significant side effects elsewhere, and that NUMA-awareness is critical for predictable performance on modern architectures.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;references&quot;&gt;References&lt;&#x2F;h1&gt;
+&lt;p&gt;[1] A. Panda, A. Panwar, and A. Basu, “nuKSM: NUMA-aware Memory De-duplication on Multi-socket Servers,” &lt;em&gt;Proceedings of the 30th International Conference on Parallel Architectures and Compilation Techniques (PACT)&lt;&#x2F;em&gt;, Oct. 2021, pp. 258–269, doi: 10.1109&#x2F;PACT52795.2021.00026.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;ai-disclosure&quot;&gt;AI Disclosure&lt;&#x2F;h1&gt;
+&lt;ul&gt;
+&lt;li&gt;ChatGPT was used to aid in research and fixing grammatical errors.&lt;&#x2F;li&gt;
+&lt;li&gt;Generative AI can be useful tools for tasks such as summarizing or drafting, however, they may give inaccurate information confidently and should always have generated information validated&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+</description>
+            </item>
+        
+            <item>
+                <title>Piranha: A Scalable Architecture Based on Single-Chip Multiprocessing</title>
+                <pubDate>Mon, 02 Feb 2026 00:00:00 +0000</pubDate>
+                <link>https%3A//khale.github.io/mem-systems-w26/blog/piranha-a-scalable-architecture-based-on-single-chip-multiprocessing/</link>
+                <guid>https%3A//khale.github.io/mem-systems-w26/blog/piranha-a-scalable-architecture-based-on-single-chip-multiprocessing/</guid>
+                <description>&lt;h1 id=&quot;introduction&quot;&gt;Introduction&lt;&#x2F;h1&gt;
+&lt;ul&gt;
+&lt;li&gt;Preceding the release of this paper in June of 2000, most processors were single core with a little slower than modern clock speeds at around 1 GHz.&lt;&#x2F;li&gt;
+&lt;li&gt;This marks the end of the era of clock speeds increasing exponentially over time.
+&lt;ul&gt;
+&lt;li&gt;Just a few years before, clock rates were in the 100&#x27;s of MHz.&lt;&#x2F;li&gt;
+&lt;li&gt;In the 25 years since then, CPUs have reached around 6-8 GHz at the upper end.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;methods-for-improving-performance&quot;&gt;Methods For Improving Performance&lt;&#x2F;h2&gt;
+&lt;p&gt;Without the ability to increase clock rates, performance gains mainly come from reducing memory latency and increasing parallelism.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;instruction-level-parallelism-ilp&quot;&gt;Instruction Level Parallelism (ILP)&lt;&#x2F;h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Instruction level parallelism is a method of allowing multiple instructions to be executed in parallel for a single thread of execution running on a single core.&lt;&#x2F;li&gt;
+&lt;li&gt;Methods of implementation include:
+&lt;ul&gt;
+&lt;li&gt;Pipelining&lt;&#x2F;li&gt;
+&lt;li&gt;Out-of-Order (OoO) execution&lt;&#x2F;li&gt;
+&lt;li&gt;Speculative execution &#x2F; branch prediction&lt;&#x2F;li&gt;
+&lt;li&gt;Very Large Instruction Word (VLIW) sets&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;Has a relatively low ceiling to potential performance gains, and can get complex quickly.
+&lt;ul&gt;
+&lt;li&gt;Pipelining is relatively easy to implement and industry standard at the writing of this paper leading to its use here in the pre-existing Alpha cores that were used.&lt;&#x2F;li&gt;
+&lt;li&gt;VLIW can give performance gains in certain workloads that use the instructions, yet is heavily workload dependent.&lt;&#x2F;li&gt;
+&lt;li&gt;More complicated ILP such as out-of-order execution requires careful engineering and has varying performance gains based on the workload.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;Especially for commercial workloads which tend to be more data-dependent like OLTP, most CPU time is spent on memory stalls instead of instruction execution. The more complex methods of OLP become less effective in this circumstance, as the majority of the delays are coming from memory fetches rather than instruction execution.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h3 id=&quot;thread-level-parallelism-tlp&quot;&gt;Thread Level Parallelism (TLP)&lt;&#x2F;h3&gt;
+&lt;ul&gt;
+&lt;li&gt;This paper introduces an alternative path for parallelism.
+&lt;ul&gt;
+&lt;li&gt;Utilize simple processor cores which minimize development costs.&lt;&#x2F;li&gt;
+&lt;li&gt;Increase parallelism by adding multiple cores.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;This method increases parallelism of instruction execution as well as memory access.&lt;&#x2F;li&gt;
+&lt;li&gt;Fairly simple to implement and develop in hardware.&lt;&#x2F;li&gt;
+&lt;li&gt;Does add some complexity to the software side in handling safe access to shared memory.
+&lt;ul&gt;
+&lt;li&gt;ILP handles this for the programmer, allowing performance boosts for an unmodified program, but has a lower limit to its potential performance boost.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h1 id=&quot;architecture&quot;&gt;Architecture&lt;&#x2F;h1&gt;
+&lt;h2 id=&quot;top-level&quot;&gt;Top Level&lt;&#x2F;h2&gt;
+&lt;h3 id=&quot;scalable-architecture&quot;&gt;Scalable Architecture&lt;&#x2F;h3&gt;
+&lt;p&gt;Designed to allow easy scaling and custom implementation for up to 1024 nodes (of below processor and I&#x2F;O chips).&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;In this paper they explore a single chip with 8 cores.&lt;&#x2F;li&gt;
+&lt;li&gt;The optimal ratio of processor chips to I&#x2F;O chips depends on the workload.
+&lt;ul&gt;
+&lt;li&gt;This architecture allows custom builds suited for specific commercial applications.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h3 id=&quot;processor-chips&quot;&gt;Processor Chips&lt;&#x2F;h3&gt;
+&lt;ul&gt;
+&lt;li&gt;8 Alpha cores which each have their own L1 cache.&lt;&#x2F;li&gt;
+&lt;li&gt;8 L2 banks each with their own memory controller (MC)&lt;&#x2F;li&gt;
+&lt;li&gt;Protocol engines - home and remote - to handle the safe and efficient sharing of memory within and across chips.&lt;&#x2F;li&gt;
+&lt;li&gt;A system control chip for miscellaneous maintenance related functions - system configuration, initialization, interrupts, exceptions and performance monitoring.&lt;&#x2F;li&gt;
+&lt;li&gt;Intrachip switch - connects all of the above together.&lt;&#x2F;li&gt;
+&lt;li&gt;A packet switch that connects the home and remote engines as well as the system control chip to the input and output queue for the system interconnect router.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;&lt;img src=&quot;https:&#x2F;&#x2F;khale.github.io&#x2F;mem-systems-w26&#x2F;blog&#x2F;piranha-a-scalable-architecture-based-on-single-chip-multiprocessing&#x2F;.&#x2F;Processing-Node-Diagram.png&quot; alt=&quot;Processing Node Diagram&quot; &#x2F;&gt;&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;i-o-chips&quot;&gt;I&#x2F;O Chips&lt;&#x2F;h3&gt;
+&lt;ul&gt;
+&lt;li&gt;The processor chips don&#x27;t have any I&#x2F;O capability, instead they are connected to an I&#x2F;O chip through the system interconnect.&lt;&#x2F;li&gt;
+&lt;li&gt;Almost identical in design to the processor chips, except:
+&lt;ul&gt;
+&lt;li&gt;They only include one alpha CPU core and one L2 bank.&lt;&#x2F;li&gt;
+&lt;li&gt;Add a PCI&#x2F;X interface with its own L1 cache in place of one of the cores.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;As seen by the programmer, the CPU core on the I&#x2F;O chip is indistinguishable from the others.&lt;&#x2F;li&gt;
+&lt;li&gt;This CPU core provides instruction execution with lower latency access to I&#x2F;O. Helpful for:
+&lt;ul&gt;
+&lt;li&gt;Device drivers&lt;&#x2F;li&gt;
+&lt;li&gt;I&#x2F;O interface virtualization (to provide an interface with control registers)&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;Has a relatively small area compared to the multi-core processing chip, involves much less cache and logic.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;&lt;img src=&quot;https:&#x2F;&#x2F;khale.github.io&#x2F;mem-systems-w26&#x2F;blog&#x2F;piranha-a-scalable-architecture-based-on-single-chip-multiprocessing&#x2F;IO-Node-Diagram.png&quot; alt=&quot;I&#x2F;O Chip Diagram&quot; &#x2F;&gt;&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;components&quot;&gt;Components&lt;&#x2F;h2&gt;
+&lt;h3 id=&quot;shared-l2-cache&quot;&gt;Shared L2 Cache&lt;&#x2F;h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Because L1 and L2 are the same size (1MB), maintaining data-inclusion in the L2 could potentially waste all of its capacity on data that&#x27;s already in the L1s.&lt;&#x2F;li&gt;
+&lt;li&gt;Instead, the L2 stores a directory of all of the lines in each L1
+&lt;ul&gt;
+&lt;li&gt;Uses 32x less memory than storing copies of the data.&lt;&#x2F;li&gt;
+&lt;li&gt;Helps to maintain a sense of ownership of each cache line to help maintain memory coherence.&lt;&#x2F;li&gt;
+&lt;li&gt;Each line is either owned by the L2, exclusively owned by an L1 cache, or owned by one of the L1s that have it (typically the last requester).&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;The L2&#x27;s main purpose is as a victim cache for lines evicted from the L1s.
+&lt;ul&gt;
+&lt;li&gt;When something misses in the L2, the line is directly loaded into the L1 from memory, helping to lower the miss latency.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;The L2 is split into 8 banks, but all L1 caches have access to all banks through the intra-chip switch.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h3 id=&quot;intra-chip-switch&quot;&gt;Intra-chip Switch&lt;&#x2F;h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Optimized for bandwidth
+&lt;ul&gt;
+&lt;li&gt;At 32 GB&#x2F;s or about 3 times the memory bandwidth, optimal scheduling becomes less important.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;Attached to protocol engines to handle memory management.&lt;&#x2F;li&gt;
+&lt;li&gt;Attached to our system interconnect&#x27;s input and output queues to allow outsourcing of compute to other nodes.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h3 id=&quot;protocol-engine&quot;&gt;Protocol Engine&lt;&#x2F;h3&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;Protocol engines are implemented as microprogrammable controllers and are identical except for the microcode they execute.&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Home engine exports local memory.&lt;&#x2F;li&gt;
+&lt;li&gt;Remote engine imports remote memory.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;Uses invalidation-based directory protocol to maintain inter-node coherence.&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;When a remote node attempts to write to shared data it must:
+&lt;ul&gt;
+&lt;li&gt;Send a request for exclusive access to the nodes that share the data.&lt;&#x2F;li&gt;
+&lt;li&gt;Wait until an acknowledgement is received.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;This approach helps to avoid the use of negative acknowledgements, which can add a significant amount of latency to remote operations.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;Utilizes cruise-missile-invalidates (CMI), which allow invalidation of a large number of nodes from only a handful of messages.&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Each invalidation packet visits and is relayed by multiple, predetermined nodes, generating a single acknowledgment once it reaches the final node.&lt;&#x2F;li&gt;
+&lt;li&gt;Significantly decreases network traffic, limiting the required buffer space in the network.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h1 id=&quot;performance-results&quot;&gt;Performance Results&lt;&#x2F;h1&gt;
+&lt;ul&gt;
+&lt;li&gt;Simulated and compared performance of the 500 MHz single chip 8 core Piranha CPU to a:
+&lt;ul&gt;
+&lt;li&gt;500 MHz single-core Piranha&lt;&#x2F;li&gt;
+&lt;li&gt;1 GHz in-order processor&lt;&#x2F;li&gt;
+&lt;li&gt;1 GHz 4-issue (similar to threads) out-of-order processor&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;Found that the 8-core Piranha gives 2.9x greater bandwidth than a next-generation (for the time) 1 GHz 4-issue OoO processor.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;&lt;img src=&quot;https:&#x2F;&#x2F;khale.github.io&#x2F;mem-systems-w26&#x2F;blog&#x2F;piranha-a-scalable-architecture-based-on-single-chip-multiprocessing&#x2F;Piranha-Performance-Chart.png&quot; alt=&quot;Piranha Performance Comparison to Next-Gen OoO Processors&quot; &#x2F;&gt;&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;class-discussion&quot;&gt;Class Discussion&lt;&#x2F;h1&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;Why microprocessors vs regular server processors (slow clock speeds?)&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;May have been confusion on the term &quot;microprocessor&quot;. Micro is in terms of size, not necessarily speed or performance.&lt;&#x2F;li&gt;
+&lt;li&gt;Clock speeds aren&#x27;t that slow, the flagship at the time was around 1GHz single-cored, this paper tests clock rates of 500 MHz and 1GHz, while adding more cores to boost performance.&lt;&#x2F;li&gt;
+&lt;li&gt;Simple base design allows growing to a large scale without much difficulty.&lt;&#x2F;li&gt;
+&lt;li&gt;This paper was a sort of inflection point for the industry, at a time where Intel was investing in single-core optimization.&lt;&#x2F;li&gt;
+&lt;li&gt;Intel continued on the path of single-core Out-of-Order processors for some time after this paper, with the first multicore CPUs hitting the markets from AMD around 5 years later.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;Maximizing single core performance is expensive and doesn&#x27;t gain us very much in performance.&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;At the time of this paper (2000), CPU clocks had been climbing quickly, but began to reach a ceiling (1GHz then, ~5-10GHz now)&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;Directory coherence&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Use L2 as a sort of cache&lt;&#x2F;li&gt;
+&lt;li&gt;Can scale between individual packages that each include many cores&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;Potential for memory bottlenecks in large parallel access&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;For reads, the data can be shared between caches instead of requiring a large amount of DRAM reads&lt;&#x2F;li&gt;
+&lt;li&gt;Many writes must go to DRAM, where each operation must be serialized and sent to the memory controller.&lt;&#x2F;li&gt;
+&lt;li&gt;Writes can be queued at the L2 cache, where the data can be shared &#x2F; read to an adjacent cache.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;For some servers, the network becomes the bottleneck at serving requests.&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h1 id=&quot;conclusion&quot;&gt;Conclusion&lt;&#x2F;h1&gt;
+&lt;p&gt;Around 5 years after this paper, dual-core CPUs began to enter the market. Nowadays, it would be difficult to find anything, even a phone or chromebook, with less than 8 cores. This shows just how effective the ideas in this paper were at improving performance for not only commercial workloads but desktop workloads as well. Through simulation and modelling, they managed to prove the efficacy of a design that is scaled through adding more cores, instead of making them more complex. Although it can hurt performance on workloads that only utilize a single-core, the large potential to boost performance has proven itself worth this cost.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;ai-disclosure&quot;&gt;AI Disclosure&lt;&#x2F;h1&gt;
+&lt;ul&gt;
+&lt;li&gt;NotebookLM to summarize and search through paper.&lt;&#x2F;li&gt;
+&lt;li&gt;ChatGPT to aid in some research and provide revision notes.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+</description>
+            </item>
+        
+            <item>
+                <title>High Performance Cache Replacement Using Re-Reference Interval Prediction (RRIP)</title>
+                <pubDate>Tue, 27 Jan 2026 00:00:00 +0000</pubDate>
+                <link>https%3A//khale.github.io/mem-systems-w26/blog/high-performance-cache-replacement-using-rrip/</link>
+                <guid>https%3A//khale.github.io/mem-systems-w26/blog/high-performance-cache-replacement-using-rrip/</guid>
+                <description>&lt;h2 id=&quot;introduction&quot;&gt;Introduction&lt;&#x2F;h2&gt;
+&lt;p&gt;Cache replacement policies play a central role in determining the effectiveness of modern cache hierarchies. Despite decades of architectural evolution, the dominant policy remains Least Recently Used (LRU), largely due to its intuitive appeal and historical simplicity. However, LRU operates off the assumption that recent access implies near-future reuse. While often true, this assumption fails for a wide range of contemporary workloads, including streaming applications, large working sets, and multiprogrammed environments where interference dominates cache behavior.&lt;&#x2F;p&gt;
+&lt;p&gt;The paper &lt;em&gt;High Performance Cache Replacement Using Re-reference Interval Prediction (RRIP)&lt;&#x2F;em&gt; introduces RRIP as an alternative replacment policy to LRU. Rather than estimating reuse indirectly through recency, RRIP explicitly predicts how far in the future a cache block will be referenced again. This alternative prediction method enables replacement decisions that more closely approximate optimal behavior, while still remaining implementable in real hardware.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;background-and-motivation&quot;&gt;Background and Motivation&lt;&#x2F;h2&gt;
+&lt;h3 id=&quot;limitations-of-lru&quot;&gt;Limitations of LRU&lt;&#x2F;h3&gt;
+&lt;p&gt;LRU assumes that recently accessed data will be reused in the near future. This assumption breaks down in several common scenarios:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Streaming workloads&lt;&#x2F;strong&gt;, where data is accessed once and never reused&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;strong&gt;Large working sets&lt;&#x2F;strong&gt; that exceed cache capacity, leading to thrashing&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;strong&gt;Mixed access patterns&lt;&#x2F;strong&gt;, where frequently reused data structures coexist with large scans&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;In such cases, LRU allows non-temporal data to evict frequently reused cache blocks, significantly degrading performance.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;key-concepts-and-terminology&quot;&gt;Key Concepts and Terminology&lt;&#x2F;h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Re-reference Interval Prediction (RRIP):&lt;&#x2F;strong&gt; A cache replacement framework that predicts how long it will be before a cache block is reused, rather than relying solely on recency.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;strong&gt;Re-reference Prediction Value (RRPV):&lt;&#x2F;strong&gt; A small per-cache-line counter that encodes the predicted distance to the next reuse. Larger values indicate farther reuse.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;strong&gt;Static RRIP (SRRIP):&lt;&#x2F;strong&gt; A policy that inserts new cache lines with a long predicted re-reference interval, providing strong resistance to cache pollution from streaming accesses.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;strong&gt;Bimodal RRIP (BRRIP):&lt;&#x2F;strong&gt; A variant that usually inserts cache lines with a very long re-reference interval but occasionally inserts them as likely-to-be-reused, improving performance under thrashing workloads.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;strong&gt;Dynamic RRIP (DRRIP):&lt;&#x2F;strong&gt; A hybrid policy that dynamically selects between using SRRIP or BRIPP using Set Dueling.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;strong&gt;Set Dueling:&lt;&#x2F;strong&gt; A technique that dedicates a small number of cache sets to competing policies and uses their miss behavior to select the most effective policy at runtime.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;overview-of-the-rrip-mechanism&quot;&gt;Overview of the RRIP Mechanism&lt;&#x2F;h2&gt;
+&lt;p&gt;RRIP associates each cache block with an RRPV counter that represents its predicted reuse distance. Conceptually:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;RRPV = 0&lt;&#x2F;strong&gt; indicates an expected near-immediate reuse&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;strong&gt;RRPV = Max&lt;&#x2F;strong&gt; indicates reuse far in the future or no reuse at all&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h3 id=&quot;replacement-policy&quot;&gt;Replacement Policy&lt;&#x2F;h3&gt;
+&lt;p&gt;On a cache miss:&lt;&#x2F;p&gt;
+&lt;ol&gt;
+&lt;li&gt;The cache searches for a block with the maximum RRPV.&lt;&#x2F;li&gt;
+&lt;li&gt;If no such block exists, all RRPVs are incremented until at least one reaches the maximum value.&lt;&#x2F;li&gt;
+&lt;li&gt;A block with the maximum RRPV is selected for eviction.&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;p&gt;On a cache hit:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;The accessed block’s RRPV is decremented, indicating high reuse potential.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h3 id=&quot;scan-resistance-and-adaptivity&quot;&gt;Scan Resistance and Adaptivity&lt;&#x2F;h3&gt;
+&lt;p&gt;SRRIP inserts new cache blocks with long predicted reuse distances, preventing streaming data from displacing frequently reused blocks. DRRIP extends this approach by dynamically choosing between SRRIP and BRRIP based on runtime behavior. Using set dueling, DRRIP adapts to workload characteristics without software intervention.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;evaluation-and-results&quot;&gt;Evaluation and Results&lt;&#x2F;h2&gt;
+&lt;p&gt;The authors evaluate RRIP across a wide range of single-core and multi-core workloads. Key findings include:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Performance Improvements&lt;&#x2F;strong&gt;
+&lt;ul&gt;
+&lt;li&gt;SRRIP achieves approximately 4–7% performance improvement over LRU&lt;&#x2F;li&gt;
+&lt;li&gt;DRRIP achieves approximately 9–10% improvement over LRU&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;strong&gt;Hardware Overhead&lt;&#x2F;strong&gt;
+&lt;ul&gt;
+&lt;li&gt;Only 2 bits per cache block are required&lt;&#x2F;li&gt;
+&lt;li&gt;Lower complexity than LRU implementations&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;strong&gt;Robustness&lt;&#x2F;strong&gt;
+&lt;ul&gt;
+&lt;li&gt;Strong resistance to cache pollution from scans&lt;&#x2F;li&gt;
+&lt;li&gt;Stable performance across diverse application behaviors&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;strong&gt;Multicore Benefits&lt;&#x2F;strong&gt;
+&lt;ul&gt;
+&lt;li&gt;Reduced inter-core cache interference&lt;&#x2F;li&gt;
+&lt;li&gt;Improved overall throughput and fairness&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;These results demonstrate that RRIP provides consistent gains with minimal additional hardware cost.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;strengths-and-limitations&quot;&gt;Strengths and Limitations&lt;&#x2F;h2&gt;
+&lt;h3 id=&quot;strengths&quot;&gt;Strengths&lt;&#x2F;h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Conceptual Clarity:&lt;&#x2F;strong&gt; Explicitly modeling reuse distance aligns more closely with optimal replacement behavior than recency-based policies.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;strong&gt;Low Implementation Cost:&lt;&#x2F;strong&gt; RRIP requires minimal state and simpler logic than LRU.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;strong&gt;Adaptability:&lt;&#x2F;strong&gt; DRRIP dynamically adjusts to workload behavior without programmer or operating system involvement.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h3 id=&quot;limitations&quot;&gt;Limitations&lt;&#x2F;h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Predictive Approximation:&lt;&#x2F;strong&gt; RRPVs provide only a coarse approximation of reuse distance, especially with small counters, and irregular access patterns may still lead to poor predictions.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;strong&gt;Evaluation Scope:&lt;&#x2F;strong&gt; Some highly pointer-intensive or unpredictable workloads are not extensively explored.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;class-discussion&quot;&gt;Class Discussion&lt;&#x2F;h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Where is the data going when it is not recently used? Is there demotion between levels of cache?:&lt;&#x2F;strong&gt;
+&lt;ul&gt;
+&lt;li&gt;Yes, when you kick something from the L1, it goes to the L2. Caches are generally inclusive.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;strong&gt;Why is this not implemented in higher levels of cache?:&lt;&#x2F;strong&gt;
+&lt;ul&gt;
+&lt;li&gt;Latency constraints and hardware overhead. More computational logic for finding near and far values.. Not much gain in efficiency.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;strong&gt;What eviction policy is used in L1?:&lt;&#x2F;strong&gt;
+&lt;ul&gt;
+&lt;li&gt;NRU is used. Only one bit and very fast.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;strong&gt;How often is L3 accessed in workloads such as gaming? Are the performance gains worth it?:&quot;&lt;&#x2F;strong&gt;
+&lt;ul&gt;
+&lt;li&gt;Depends on the workload. The paper showed that performance increased in all benchmarks expect photoshop. Performance increases across the board seem to show L3 cache access. L3 is designed to minimize cache misses, so additional hardware is fine because latency is not an issue.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;strong&gt;What hardware was used to test this?&lt;&#x2F;strong&gt;
+&lt;ul&gt;
+&lt;li&gt;CNP-based x86 simulator, as well as games, and productivity apps.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;conclusion&quot;&gt;Conclusion&lt;&#x2F;h2&gt;
+&lt;p&gt;The RRIP framework illustrates that cache replacement policies can be both simple and highly effective when they directly model reuse behavior. By predicting re-reference intervals instead of relying on recency, RRIP consistently outperforms traditional LRU while maintaining low hardware overhead. The success of DRRIP further demonstrates the importance of adaptive policies in handling modern, diverse workloads.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;references&quot;&gt;References&lt;&#x2F;h2&gt;
+&lt;ul&gt;
+&lt;li&gt;Jaleel, A., et al. &lt;em&gt;High Performance Cache Replacement Using Re-reference Interval Prediction&lt;&#x2F;em&gt; (https:&#x2F;&#x2F;dl.acm.org&#x2F;doi&#x2F;10.1145&#x2F;1815961.1815971)&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h1 id=&quot;generative-ai-disclosure&quot;&gt;Generative AI Disclosure&lt;&#x2F;h1&gt;
+&lt;ul&gt;
+&lt;li&gt;ChatGPT was used to generate a Markdown file template and check spelling and grammar.&lt;&#x2F;li&gt;
+&lt;li&gt;Generative AI can be useful tools for tasks such as summarizing or drafting, however, they may give innacurate information confidently and should always have generated information validated&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+</description>
+            </item>
+        
+            <item>
+                <title>(MC)^2: Lazy MemCopy at the Memory Controller</title>
+                <pubDate>Wed, 21 Jan 2026 00:00:00 +0000</pubDate>
+                <link>https%3A//khale.github.io/mem-systems-w26/blog/mc-2-lazy-memcopy-at-the-memory-controller/</link>
+                <guid>https%3A//khale.github.io/mem-systems-w26/blog/mc-2-lazy-memcopy-at-the-memory-controller/</guid>
+                <description>&lt;h1 id=&quot;introduction&quot;&gt;Introduction&lt;&#x2F;h1&gt;
+&lt;p&gt;Modern software systems rely heavily on the process of memory copying to provide isolation, simplify synchronization, and support common operations such as serialization, I&#x2F;O buffering, and snapshot creation. Although the system of memcpy appears simple, it holds many operations that impose a significant performance cost; A large portion of the CPU cycles are spent stalled on cache misses and DRAM accesses, in many cases only a small portion of the copied data is ever actually used. As the processor speeds continued to outpace the improvements in memory latency, the inefficiency of eager, byte-by-byte copying becomes a major bottleneck to the entire system.&lt;&#x2F;p&gt;
+&lt;p&gt;The (MC)² Lazy Memcopy style architecture addresses some of these problems. This is done by rethinking where and when the data movement occurs. Instead of immediately copying data at the CPU, (MC)² shifts the copy management into the memory controller and delays the actual data transfer until it is actually needed. By tracking copy intent and resolving it only on demand, (MC)² aims to eliminate redundant memory traffic, reduce cache pollution, and substantially lower the stall time that is associated with the traditional memory copy operation.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;overview&quot;&gt;Overview&lt;&#x2F;h1&gt;
+&lt;p&gt;(MC)² reduces used to reduced the overall high cost of memory copying by moving the copy management into the memory controller. This is done by making lazy copies. Instead of constantly copying data with memcpy, the system tracks copy intentions using a Copy Tracking table (CTT) and delays the actual movement of bytes, until the data is actually needed for an operation. By only making copies when the destination is read or the source is overwritten. With (MC)² it avoids unnecessary memory traffic and CPU stalls, which are a major bottleneck in modern systems due to cache misses and the long DRAM latencies.&lt;&#x2F;p&gt;
+&lt;p&gt;The use of a memory controller is extended with the hardware structures, including the CTT and a bounce pending queue (BPQ), to transparently intercept copy requests and route memory accesses to the correct location both physically and digitally. This allows for the destination reads to be serviced directly from the source buffer and source writes to trigger on-demand copying. All of this happens while preserving memory consistency and cache coherence. By operating below the cache hierarchy and working on the physical addresses, (MC)² provides fine-grained, cacheline-level copying virtualization, without requiring the operating system or application level changes.&lt;&#x2F;p&gt;
+&lt;p&gt;(MC)² further improves performance by handling chains of copies, merging adjacent regions, and performing background copy completion when tracking resources become saturated. Evaluations that were done across microbenchmarks and real applications such as Protobuf, MongoDB, MVCC databases, and fork-based snapshots showed significant reductions in copy-induced stalls and memory bandwidth consumption, yielding substantial speedups small and partially used buffers that dominate real world workloads.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;hardware-function-and-changes&quot;&gt;Hardware Function and changes&lt;&#x2F;h1&gt;
+&lt;p&gt;CPU pushes the copy management into the memory controller for MCLAZY.  So a SRAM based CTT (copy tracking table) and a small queue called BPQ (bounce pending queue) were added.
+CTT functions:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;merge adjacent tracked regions&lt;&#x2F;li&gt;
+&lt;li&gt;avoid chains like A -&amp;gt;B and B-&amp;gt;C (rewrite to A-&amp;gt;C)&lt;&#x2F;li&gt;
+&lt;li&gt;prevent two rules from overlapping the same dest region&lt;&#x2F;li&gt;
+&lt;li&gt;and free CTT space by completing copies in the background
+BPQ function:
+It just hold the src writes operation until the actual copy to the dest finishes before the writing of the src can proceed.
+Steps of the hardware:&lt;&#x2F;li&gt;
+&lt;li&gt;CPU sends copy instruction&lt;&#x2F;li&gt;
+&lt;li&gt;Cache does src write back so ram has latest src snapshot and invalidates dst so that in later reading dest is not found in cache and it is forced to go to CTT&lt;&#x2F;li&gt;
+&lt;li&gt;MC records the mapping in the CTT
+Later access:
+&lt;ul&gt;
+&lt;li&gt;Src read - proceed normally&lt;&#x2F;li&gt;
+&lt;li&gt;Dest write – proceed normally as it is basically updating the dest  and the mapping in CTT is not even required&lt;&#x2F;li&gt;
+&lt;li&gt;Read from src- not the actual lazy copy needs to go through consulting the CTT. Once done removing the CTT mapping&lt;&#x2F;li&gt;
+&lt;li&gt;Write to src – go to Bpq and let lazy copy of the dest finish first, then proceed.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h1 id=&quot;software-function-and-changes&quot;&gt;Software  Function and Changes:&lt;&#x2F;h1&gt;
+&lt;p&gt;(MC)² made some changes to the software side too. It introduced a clean interface ( a wrapper) for lazy copying  “memcpy(dest, src, size)”. Programs use it arbitrary sizes and alignments. The paper states the hardware mechanism is most efficient when it can track is 64 bytes chunks or cacheline sized. The software therefore provides the wrapper that preservers norma copy  but internally chooses between&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;normal copy for small or awkward pieces&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;Lazy copying fir aligned bulk
+Steps for the new instruction :&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;Do normal copy if too small (smaller than 64 bytes)&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;If dest is not cacheline aligned, compute how many bytes required to make dest aligned , normal copy exactly those bytes, advance src and dest and reduce size accordingly. The remaining region can be handled in cacheline chunks&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;Do the MCLAZY of the bulk region, these are multiples of cacheline sizes and less than a page&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;If something is left , do normal copy.&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;Finally do a fence such that the lazy copy maintains proper order of  memory operations&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;Example , suppose the program calls memcpy_lazy(dest=…03, src=…00, size=200) and the cacheline is 64 B.&lt;&#x2F;p&gt;
+&lt;p&gt;The wrapper will:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Copy  61 bytes normally (to align dest)&lt;&#x2F;li&gt;
+&lt;li&gt;Use MCLAZY for the next 128 bytes&lt;&#x2F;li&gt;
+&lt;li&gt;Copy the last 11 bytes normally&lt;&#x2F;li&gt;
+&lt;li&gt;Fence
+There is one last function introduced called MCFREE(buffer, size) which can be sometimes used by software to tell the hardware to drop mappings of dest-&amp;gt;src.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h1 id=&quot;results&quot;&gt;Results:&lt;&#x2F;h1&gt;
+&lt;p&gt;In performance evaluations, (MC)² lazy memcpy outperforms many of the existing systems. The only other system that got close to it in terms of latency is their zIO. For uncached source buffers, the lazy copy system achieves up to 11 times lower latency than the conventional memcpy for medium and large copy sizes over 1 KB, where DRAM is access is the dominate use of time for execution. When the source is already in the cache, the traditional memcpy can be slightly faster for smaller file sizes due to the addition of the memory controller logic in the (MC)² lazy memcpy system. For a different type of access pattern, where the it reads copied data&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;key-results&quot;&gt;Key Results:&lt;&#x2F;h1&gt;
+&lt;p&gt;Key results:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;11x lower latency for medium and large copy sizes (≥ 1 KB)&lt;&#x2F;li&gt;
+&lt;li&gt;43% speedup for Protobuf serialization&lt;&#x2F;li&gt;
+&lt;li&gt;Mongo DB I&#x2F;O stack: ~15.5% throughput improvement&lt;&#x2F;li&gt;
+&lt;li&gt;MVCC databases: up to 78% speedup for read-modify-write workloads on small files&lt;&#x2F;li&gt;
+&lt;li&gt;Pipes and streaming I&#x2F;O: 15 – 30% higher throughput by eliminating redundant kernel buffer copies&lt;&#x2F;li&gt;
+&lt;li&gt;CTT reaches 50% occupancy prevents bandwidth saturation while avoiding CPU stalls.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h1 id=&quot;class-discussion&quot;&gt;Class Discussion&lt;&#x2F;h1&gt;
+&lt;p&gt;The system presents a valuable solution but at what cost?&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;The system has many advantages but how much does it cost to manufacture and what are the downsides to this system&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;Why hasn’t this been adapted yet?&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;The lazy copy system is relatively new to the discussion so it might be used in future CPU’s and memory control systems that have yet to be released as this paper came out in 2024&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;Is this a hardware vulnerability?&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;As of right now there is nothing to suggest that it is but when future research comes out it might prove that it is a vulnerability. As it could possibly have problems that aren’t discussed in the paper that could cause memory loss or memory overload&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;What is the actual cost?&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;This is a complete unknown it could be just a slight raise in price or a drastic increase in price due to a new way to make the memory systems requiring new processes to manufacture.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h1 id=&quot;conclusion&quot;&gt;Conclusion&lt;&#x2F;h1&gt;
+&lt;p&gt;In summary, (MC)² lazy memcpy shows that a large portion of the time the system uses is wasted waiting for copying data that is never fully used, with CPU’s stalled waiting on memory rather than doing other useful work. By moving this into the memory controller and making those lazy copies, the system then only has to track copy intent and only moves the data when the data is needed. Hardware support through the copy tracking table and bounce pending Queue enables this to happen in a transparent faction.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;references&quot;&gt;References:&lt;&#x2F;h1&gt;
+&lt;ul&gt;
+&lt;li&gt;Paper: https:&#x2F;&#x2F;dl.acm.org&#x2F;doi&#x2F;10.1109&#x2F;ISCA59077.2024.00084&lt;&#x2F;li&gt;
+&lt;li&gt;Slides: https:&#x2F;&#x2F;docs.google.com&#x2F;presentation&#x2F;d&#x2F;1LHGMNmEvYYec-WrcbDhAI9wVA5Bh5tclDccBAJohub0&#x2F;edit?usp=sharing&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h1 id=&quot;generative-ai-disclosure&quot;&gt;Generative AI Disclosure&lt;&#x2F;h1&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;ChatCPT was used just to pull notes into 1 file and check grammer&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;Generative AI can be useful tools for tasks such as summarizing or drafting, however, they may give innacurate information confidently and should always have generated information validated&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+</description>
+            </item>
+        
+            <item>
+                <title>Tiered-Latency DRAM</title>
+                <pubDate>Wed, 21 Jan 2026 00:00:00 +0000</pubDate>
+                <link>https%3A//khale.github.io/mem-systems-w26/blog/tiered-latency-dram/</link>
+                <guid>https%3A//khale.github.io/mem-systems-w26/blog/tiered-latency-dram/</guid>
+                <description>&lt;h1 id=&quot;introduction&quot;&gt;Introduction&lt;&#x2F;h1&gt;
+&lt;p&gt;The &quot;Memory Wall&quot;, the widening gap between processor speed and memory latency, remains a critical bottleneck in modern computing. While DRAM capacity and cost-per-bit have improved drastically over the life of modern computing (with the exception of memory shortages), latency has remained relatively stagnant. This post summarizes the paper, Tiered-Latency DRAM: A Low Latency and Low Cost DRAM Architecture from a Carnegie Mellon University paper, which proposes an architectural solution to this problem. The authors introduce a method to achieve the speed of specialized low-latency memory (like RLDRAM) with the cost profile of commodity DRAM, utilizing a clever circuit-level modification: the isolation transistor.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;background&quot;&gt;Background&lt;&#x2F;h1&gt;
+&lt;p&gt;The main innovation of TL-DRAM adresses the fundamental physical trade-oﬀ of bitline length in DRAM design. There are two main factors that bitline length affects.&lt;&#x2F;p&gt;
+&lt;ol&gt;
+&lt;li&gt;Commodity DRAM (Cost-Optimized): Manufacturers connect many cells (e.g., 512) to a single long bitline. This amortizes the large area cost of the sense amplifier over many bits, keeping cost-per-bit low. However, long wires have high parasitic capacitance, making them slow to charge and sense.&lt;&#x2F;li&gt;
+&lt;li&gt;Low-Latency DRAM (Latency-Optimized): Manufacturers use short bitlines, connecting less cells (e.g., 32 cells). These have low electrical load and are fast. However, they require many more sense amplifiers for the same capacity, increasing area overhead by 30-80% and driving up cost.
+Historically, the industry has optimized for cost, leaving us with cheap, high-latency memory.&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;h1 id=&quot;keywords&quot;&gt;Keywords&lt;&#x2F;h1&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Tiered-Latency DRAM (TL-DRAM):&lt;&#x2F;strong&gt; A low-cost architecture that splits a standard long bitline into two segments using an isolation transistor, enabling specialized low-latency access for the &quot;near&quot; segment while maintaining the high density of commodity DRAM.&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Isolation Transistor:&lt;&#x2F;strong&gt; A circuit component inserted into the bitline that acts as a resistive bridge to electrically decouple the segments, allowing the sense amplifier to detect data significantly faster on the &quot;near&quot; segment and moderately faster on the &quot;far&quot; segment.&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Bitline Segmentation:&lt;&#x2F;strong&gt; The architectural technique of dividing the wire connecting DRAM cells to the sense amplifier into a short, low-capacitance section and a longer section to reduce the electrical load during activation.&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Benefit-Based Caching (BBC):&lt;&#x2F;strong&gt; A hardware management policy that dynamically promotes rows to the fast &quot;near&quot; segment by calculating a score based on the total number of cycles saved by avoiding the slower &quot;far&quot; segment latencies.&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Row-to-Column Delay (tRCD):&lt;&#x2F;strong&gt; The timing constraint representing the interval required for the sense amplifier to drive the bitline to a readable threshold voltage, which TL-DRAM reduces from 15ns to 8.2ns for the near segment and 12.1ns for the far segment.&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h1 id=&quot;summary-of-the-paper&quot;&gt;Summary of the Paper&lt;&#x2F;h1&gt;
+&lt;p&gt;The core contribution of this work is splitting a standard long bitline into two segments using a single isolation transistor. This creates a tiered architecture within a single subarray:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;The Near Segment (Fast): This is a short section (e.g., 32 rows) directly connected to the sense amplifier. When accessing these rows, the isolation transistor is turned off. The sense amp sees very low capacitance, resulting in significantly reduced latency (tRCD drops from 15ns to 8.2ns).&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;The Far Segment (Tiered): This contains the remaining rows (e.g., 480 more). When accessed, the isolation transistor is turned on.&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;The &quot;Resistor&quot; Effect: Counter-intuitively, the Far Segment also sees a reduction in sensing latency (tRCD drops to 12.1ns). The isolation transistor acts as a resistor, electrically decoupling the two segments. This allows the sense amplifier to drive the near side to the sensing threshold quickly, detecting the data from the far side faster than in a standard long bitline.&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Trade-off: While sensing is fast, restoring the full charge to the far cell (tRAS) takes longer because current must trickle through the resistive transistor. Thus, the total cycle time (tRC) for the far segment increases (from 52.5ns to 65.8ns).&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;Management Mechanisms: To mitigate the slower cycle time of the far segment, the authors propose using the Near Segment as a hardware-managed cache. They introduce Benefit-Based Caching (BBC), a policy that calculates a &quot;benefit score&quot; based on how many cycles are saved by keeping a row in the near segment versus the far segment. The paper also outlines a method to copy data between segments internally without using the external I&#x2F;O bus, saving bandwidth.&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h1 id=&quot;key-results&quot;&gt;Key Results:&lt;&#x2F;h1&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;Performance:&lt;&#x2F;strong&gt; 12.8% average improvement (Weighted Speedup).&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;strong&gt;Power:&lt;&#x2F;strong&gt; ~26% reduction in power consumption (due to driving lower capacitance on near accesses).&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;strong&gt;Area:&lt;&#x2F;strong&gt; Only 3.15% area overhead (compared to &amp;gt;140% for SRAM caching).&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;h1 id=&quot;strengths-and-weaknesses&quot;&gt;Strengths and Weaknesses&lt;&#x2F;h1&gt;
+&lt;h2 id=&quot;strengths&quot;&gt;Strengths:&lt;&#x2F;h2&gt;
+&lt;ol&gt;
+&lt;li&gt;Physics-Aware Innovation: This design exploits the resistive nature of the isolation transistor to improve sensing time even for the far segment, rather than just accepting a penalty.&lt;&#x2F;li&gt;
+&lt;li&gt;Cost Effectiveness: The proposed solution fits into the current manufacturing paradigm with minimal die-size penalty (3.15%), addressing the economic constraints that usually kill low-latency proposals.&lt;&#x2F;li&gt;
+&lt;li&gt;Energy Efficiency: By reducing the effective capacitance for frequently accessed data, it attacks the physical source of power consumption in DRAM.&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;h2 id=&quot;weaknesses&quot;&gt;Weaknesses:&lt;&#x2F;h2&gt;
+&lt;ol&gt;
+&lt;li&gt;Manufacturing Inertia: While &quot;low cost,&quot; adding a transistor to the bitline still requires changing a highly optimized process. The industry is risk-averse regarding process changes.&lt;&#x2F;li&gt;
+&lt;li&gt;Controller Complexity: The Benefit-Based Caching logic must reside in the memory controller, increasing its complexity and cost.&lt;&#x2F;li&gt;
+&lt;li&gt;Workload Dependence: The performance gains rely heavily on data locality. If a workload constantly misses the &quot;Near Segment&quot; cache, performance degrades due to the Far Segment&#x27;s high tRC.&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;h1 id=&quot;class-discussion&quot;&gt;Class Discussion&lt;&#x2F;h1&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Is It Worth It?:&lt;&#x2F;strong&gt; There was significant skepticism regarding whether a 12% performance gain justifies the upfront manufacturing cost. The consensus was that industry inertia (&quot;if it ain&#x27;t broke, don&#x27;t fix it&quot;) is a massive barrier, even for a 3% area change. In addition there was skepticism in the effectiveness of the design with the lack of adoption from manufacturers.&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Use Case Limitations (AI vs. Consumer):&lt;&#x2F;strong&gt; The discussion noted that TL-DRAM is likely ineffective for modern AI and server workloads which often stream data with low locality. The consensus was that this technology is better suited for consumer electronics (e.g., CPUs with low memory) rather than high-end servers.&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Power Analysis Critique:&lt;&#x2F;strong&gt; While the paper claims ~26-28% power savings, the class noted this analysis might be optimistic. A &quot;worst-case scenario&quot; analysis (where the far segment is heavily accessed) is missing and necessary to prove viability for battery-powered consumer devices.&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Transistor as a &quot;Bridge&quot;:&lt;&#x2F;strong&gt; The discussion emphasized the mental model of the isolation transistor acting as a &quot;bridge&quot; or &quot;resistor.&quot; This conceptualization helps explain why the near segment charges so quickly and why the far segment can still be sensed quickly despite the extra load.&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Bandwidth vs. Latency:&lt;&#x2F;strong&gt; A broader point raised was whether latency is actually the primary problem to solve. For many modern applications, data bandwidth is the bottleneck, and improving latency by 10% might not result in tangible user-facing improvements.&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h1 id=&quot;sources&quot;&gt;Sources:&lt;&#x2F;h1&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a rel=&quot;external&quot; href=&quot;https:&#x2F;&#x2F;ieeexplore.ieee.org&#x2F;stamp&#x2F;stamp.jsp?arnumber=6522354&amp;amp;tag=1&quot;&gt;Tiered-Latency DRAM: A Low Latency and Low Cost DRAM Architecture&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h1 id=&quot;generative-ai-disclosure&quot;&gt;Generative AI Disclosure&lt;&#x2F;h1&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;Links to tools used: &lt;a rel=&quot;external&quot; href=&quot;https:&#x2F;&#x2F;notebooklm.google.com&#x2F;&quot;&gt;NotebookLM&lt;&#x2F;a&gt;, &lt;a rel=&quot;external&quot; href=&quot;https:&#x2F;&#x2F;gemini.google.com&#x2F;&quot;&gt;Gemini 3 Pro&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;Notebook LM was used to compile sources and summarize them, as well as get clarifying information about the paper&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;Gemini 3 Pro was used for drafting an outline template for this blogpost as well as give clearer definitions for the keywords&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;Generative AI can be useful tools for tasks such as summarizing or drafting, however, they may give innacurate information confidently and should always have generated information validated&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+</description>
+            </item>
+        
+            <item>
+                <title>Welcome to CS&#x2F;ECE 4&#x2F;599!</title>
+                <pubDate>Mon, 05 Jan 2026 00:00:00 +0000</pubDate>
+                <link>https%3A//khale.github.io/mem-systems-w26/blog/welcome/</link>
+                <guid>https%3A//khale.github.io/mem-systems-w26/blog/welcome/</guid>
+                <description>&lt;p&gt;I&#x27;m excited to teach this research course on memory systems at OSU! We&#x27;ll be covering a lot of ground,
+focusing on systems software research, but touching areas in memory technologies, fault tolerance, distributed systems, storage, hardware accelerators, and much more.&lt;&#x2F;p&gt;
+&lt;p&gt;We&#x27;ll use this course blog for paper discussions and project reports throughout the quarter.&lt;&#x2F;p&gt;
+</description>
+            </item>
+        
+    </channel>
+</rss>

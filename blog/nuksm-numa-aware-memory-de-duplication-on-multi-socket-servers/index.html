@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>CS&#x2F;ECE 4&#x2F;599: nuKSM: NUMA-aware Memory De-duplication on Multi-socket Servers</title>
+
+  <link href="https://khale.github.io/mem-systems-w26/main.css" rel="stylesheet">
+  <link rel="alternate" type="application/rss+xml" href="https://khale.github.io/mem-systems-w26/rss.xml">
+  <link rel="icon" href="https://khale.github.io/mem-systems-w26/img/favicon.ico">
+  <link rel="apple-touch-icon-precomposed" href="https://khale.github.io/mem-systems-w26/img/favicon152.png">
+  
+<meta name="twitter:card" content="summary">
+<meta property="og:type" content="article">
+<meta property="og:title" content="nuKSM: NUMA-aware Memory De-duplication on Multi-socket Servers">
+<meta property="og:description"
+    content="Introduction
+Memory de-duplication is an important aspect of Linux’s Kernel memory management system. Where pages are being scanned in main memory for pages with duplicate content. When two pages are found with the same contents, one file will remain unchanged where the other file will be mapped to the same physical address. This releases or frees the extra physical pages to be allocated for other needs. When two virtual addresses share a physical address both pages are marked as “copy-on-write” where the kernel will remap the virtual address to have its own copy once the process has decided to write to the virtual address. This was implemented to run more virtual machines on a host by sharing memory between users and processes.
+This paper nuKSM: NUMA-aware Memory De-duplication on Multi-socket Servers” proposes a new way of memory deduplication by making “nuKSM” which is a NUMA “Non-uniform-memory-access” aware. The goal of this paper is to create a KSM implementation that equally spreads the “NUMA-tax” across all NUMA nodes. Instead of making an arbitrary decision of where to consolidate memory, the nuKSM makes a decision of which process to consolidate the data based on the priority of that node.
+Background and Motivation
+KSM is very good at what it is meant to do. It effectively can save memory through de-duplication in a cost-effective way. Where it struggles is on multi-core processes such as servers. This often will not work to the same extent on multi-socket processes because it is unaware of what CPU’s are close to what memory and the priority of each CPU comparative to others in a system. This leads to:">
+
+
+</head>
+<body >
+  <header>
+    <nav>
+      <h1>
+          <a href="https://khale.github.io/mem-systems-w26">CS&#x2F;ECE 4&#x2F;599</a>
+      </h1>
+      
+      
+      
+      <p><a href="https://khale.github.io/mem-systems-w26/schedule/">
+        Schedule
+      </a></p>
+      
+      
+      
+      <p><a href="https://khale.github.io/mem-systems-w26/project-ideas/">
+        Project Ideas
+      </a></p>
+      
+      
+      
+      <p><a href="https://khale.github.io/mem-systems-w26/syllabus/">
+        Syllabus
+      </a></p>
+      
+      
+      
+      <p><a href="https://khale.github.io/mem-systems-w26/extra-reading/">
+        Extra Resources
+      </a></p>
+      
+      
+      
+      <p><a href="https:&#x2F;&#x2F;khale.github.io&#x2F;mem-systems-w26&#x2F;lesson&#x2F;">
+        Lessons
+      </a></p>
+      
+      <p><a href="https://github.com/khale/mem-systems-w26/discussions">Discussions</a></p>
+      
+      
+      <p><a href="https:&#x2F;&#x2F;khale.github.io&#x2F;mem-systems-w26&#x2F;blog&#x2F;">
+        Blog
+      </a></p>
+    </nav>
+  </header>
+  <main>
+    
+
+
+<h1>
+    <a href="https:&#x2F;&#x2F;khale.github.io&#x2F;mem-systems-w26&#x2F;blog&#x2F;">
+    The CS&#x2F;ECE 4&#x2F;599 Course Blog
+    </a>
+</h1>
+<article>
+  <h1>nuKSM: NUMA-aware Memory De-duplication on Multi-socket Servers</h1>
+  <p class="details">
+    
+      <span class="author"> by
+      
+         Allen Lee(Leader &#x2F; Presentor),
+      
+        Jared Ho(Scribe),
+      
+        Deptmer Ashely(Scribe),
+      
+        John Aebi(Blogger),
+      
+        Brian Castellon Rosales(Blogger)
+      
+      <span>
+    
+    <time datetime="2026-02-03">
+      February  3, 2026
+    </time>
+  </p>
+  <h1 id="introduction">Introduction</h1>
+<p>Memory de-duplication is an important aspect of Linux’s Kernel memory management system. Where pages are being scanned in main memory for pages with duplicate content. When two pages are found with the same contents, one file will remain unchanged where the other file will be mapped to the same physical address. This releases or frees the extra physical pages to be allocated for other needs. When two virtual addresses share a physical address both pages are marked as “copy-on-write” where the kernel will remap the virtual address to have its own copy once the process has decided to write to the virtual address. This was implemented to run more virtual machines on a host by sharing memory between users and processes.</p>
+<p>This paper nuKSM: NUMA-aware Memory De-duplication on Multi-socket Servers” proposes a new way of memory deduplication by making “nuKSM” which is a NUMA “Non-uniform-memory-access” aware. The goal of this paper is to create a KSM implementation that equally spreads the “NUMA-tax” across all NUMA nodes. Instead of making an arbitrary decision of where to consolidate memory, the nuKSM makes a decision of which process to consolidate the data based on the priority of that node.</p>
+<h1 id="background-and-motivation">Background and Motivation</h1>
+<p>KSM is very good at what it is meant to do. It effectively can save memory through de-duplication in a cost-effective way. Where it struggles is on multi-core processes such as servers. This often will not work to the same extent on multi-socket processes because it is unaware of what CPU’s are close to what memory and the priority of each CPU comparative to others in a system. This leads to:</p>
+<ul>
+<li>Cores have a higher workload to fetch memory and process it which causes high performance variation between CPU nodes.</li>
+<li>Subverting priority from high priority processes that may have high remote memory access.</li>
+<li>KSM provides no way of tuning the system to balance and appropriate where data goes and the hierarchy of multi-core processes.</li>
+</ul>
+<p>Overall this paper goes into detail about how these problems can be minimized by using a NUMA aware model. This can spread out where memory is being accessed. Memory accessed more frequently by a certain core will be placed in closer proximity to said core.</p>
+<h1 id="concepts-and-definitions">Concepts and Definitions</h1>
+<ul>
+<li>NUMA-Tax: Overhead cost or latency of a certain node trying to access remote memory.</li>
+<li>De-Duplication: Where two or more pages in virtual memory have the same data. They will be merged all sharing the same physical address.</li>
+<li>Snice Value: Positive integer between 1 and 41 where the lower the number is the higher priority of a certain process.</li>
+<li>nuShare(p): A number between 0 and 1 that captures the preference of the current process whose page is scanned. This is relative to all other pages being scanned for the same content that will be de-duplicated. The higher the value the more likely it is that the content of the page will be local to that process.</li>
+<li>Stable Tree: Already de-duplicated pages are stored here.</li>
+<li>Unstable Tree: All potential candidates (pages) that have not been de-duplicated between the two most recent scans are considered for de-duplication.</li>
+</ul>
+<h1 id="implementation">Implementation</h1>
+<p>The nuKSM has 3 main goals to achieve when implementing this on top of the already existing KSM in Linux kernel version 5.4.0:</p>
+<ul>
+<li>
+<p>Addressing Performance Variability and Unfairness.</p>
+<ul>
+<li>Keeps a de-duplicated page on a NUMA node that is expected to access that page often.</li>
+<li>NUMA-Tax is paid when accessing a page on a remote node. This Tax is much smaller the more infrequently a node may access remote memory.</li>
+<li>Acts to evenly distribute this Tax among all nodes by checking the amount of times data is accessed by nodes and tries to distribute how much “Tax” each of them will pay in order to access said data.</li>
+<li>Requires knowledge of access frequency of pages to be de-duplicated. Uses accessed and referenced bits already available in the page reclamation algorithm in Linux.</li>
+</ul>
+</li>
+<li>
+<p>Priority Based Memory De-Duplication</p>
+<ul>
+<li>Creates a way to program priority for a virtual machine with a higher priority allowing for more access to local memory.</li>
+<li>nuShare equation used to calculate if a process should have more priority than all others that share the soon to be de-duplicated page.</li>
+<li>This value means the higher it is, the more likely it will be local to that process.</li>
+<li>Compared to a random number between 0 and 1 if nuShare is larger than this number, then the scanned page will be de-duplicated and local to said process.</li>
+<li>Makes it so the ratio of priority between processes converges (meaning that the ratios are reflected in the amount of pages being de-duplicated).</li>
+</ul>
+</li>
+<li>
+<p>Enhancing Responsiveness</p>
+<ul>
+<li>Utilization of forests (many unstable and stable trees) instead of a single stable and unstable tree.</li>
+<li>The index of a page is found by a function of the checksum of that page (index = page_checksum(page) % number of trees).</li>
+<li>If pages index into different trees they will never be compared so this will reduce the amount of unnecessary page comparisons.</li>
+<li>This is scalable because the amount of trees reflects the amount of physical memory. If memory is doubled the amount of trees will be proportionally doubled to fit that amount of physical memory.</li>
+<li>Makes the average height of a tree stay the same which would limit tree traversal and then makes the amount of comparisons similar. This makes it scalable for many different systems with different memory sizes.</li>
+<li>One stable and one unstable tree will have around 100MiB each which balances cost and benefit of using a de-centralized forest.</li>
+</ul>
+</li>
+</ul>
+<h1 id="evaluation-and-results">Evaluation and Results</h1>
+<p>The authors conducted a study on a dual-socket Intel Xeon Gold 6140 server with 18 cores and 192 GiB memory per socket. Base frequency for the processor is  3.2 GHz. Using Linux v5.4.0 with the kernel running Ubuntu18.04 guest OS. They extended the same kernel to test KSM vs nuKSM. Both of these operate at the same scan rate for pages (1K pages every 100ms). They executed VM on specific nodes VM-0 running on node-0 and executed instance-0 of the applications, VM1 would run on node-1 and executes instance-1. They then would test specific workloads and logged memory intensive micro-benchmarks that are specifically sensitive to NUMA.</p>
+<ul>
+<li>Two VMs running identical applications were placed on different nodes. KSM vs nuKSM performance difference ranged from 15% up to 46% for MySQL RandomAccess. Whereas the difference was negligible for nuKSM with a 4% variability with the same RandomAccess.</li>
+<li>To calculate fairness they took the minimum and maximum slowdown and divided it by the maximum slowdown between the two identical application instances.</li>
+<li>This produced a fairness value between 0 &amp; 1, where values closer to 1 indicate more equal performance across VMs.</li>
+<li>Under KSM, fairness values dropped significantly for memory-intensive workloads, showing a large imbalance between identical applications.</li>
+<li>With nuKSM enabled, fairness values were consistently close to 1 across all tested benchmarks, indicating much more balanced execution.</li>
+<li>nuKSM achieved nearly the same amount of memory de-duplication as KSM.</li>
+<li>This demonstrates that nuKSM improves fairness without reducing memory savings or overall system throughput.</li>
+<li>Priority-based evaluations showed that nuKSM correctly placed a larger fraction of de-duplicated pages on the NUMA node of higher priority VMs.</li>
+<li>As a result, higher-priority workloads experienced fewer remote memory accesses and improved runtimes, avoiding priority subversion seen in KSM.</li>
+</ul>
+<h1 id="strengths-and-weaknesses">Strengths and Weaknesses:</h1>
+<p>Strengths:</p>
+<ul>
+<li>nuKSM provides a practical improvement over KSM by directly addressing NUMA-related performance variability rather than disabling de-duplication entirely.</li>
+<li>It reuses existing Linux kernel mechanisms, such as active and inactive page lists, which avoids adding expensive new tracking overhead.</li>
+<li>The priority-based de-duplication mechanism effectively prevents priority subversion and gives users control over where de-duplicated pages are placed.</li>
+<li>nuKSM maintains nearly identical memory savings and overall throughput compared to KSM while significantly improving fairness.</li>
+<li>The decentralized forest based design scales well to large-memory systems and improves responsiveness under heavy memory pressure.</li>
+</ul>
+<p>Weaknesses:</p>
+<ul>
+<li>nuKSM does not account for available memory capacity on individual NUMA nodes when making placement decisions.</li>
+<li>Modifying KSM at this level is complex and may be difficult to deploy or maintain in production systems.</li>
+<li>Many real-world servers disable KSM entirely due to unpredictability or because memory constraints are less critical today.</li>
+<li>The approach assumes traditional NUMA architectures and may not extend cleanly to emerging heterogeneous memory systems such as NVLink or RDMA-based memory.</li>
+</ul>
+<h1 id="class-discussion">Class Discussion</h1>
+<ul>
+<li>Does nuKSM have checks for how much memory is available on different NUMA nodes?
+<ul>
+<li>Not addressed, KSM will merge by default (last node accessed)</li>
+<li>nuKSM often not implemented due to low-level issues, often solved before needing nuKSM implementation</li>
+</ul>
+</li>
+<li>Servers often just disable KSM due to availability
+<ul>
+<li>Good to look into how much memory KSM saves over large periods of time</li>
+<li>Memory may not have been as cheap when paper was proposed</li>
+</ul>
+</li>
+<li>Modifying KSM may not be the best solution to solving the NUMA problem
+<ul>
+<li>Hard to implement KSM methods especially with increasing non-unified memory (NVLink, RDMA, etc.)</li>
+<li>Works under the assumption that memory capacity is needed</li>
+</ul>
+</li>
+</ul>
+<h1 id="conclusion">Conclusion</h1>
+<p>Overall, nuKSM demonstrates that memory de-duplication and NUMA management cannot be treated as independent systems on modern multi-socket servers. While KSM is effective at reducing memory usage, its NUMA-unaware design leads to unfair performance variability and priority subversion. nuKSM addresses these issues by making de-duplication decisions based on access frequency, priority, and scalability, resulting in more balanced performance without sacrificing memory savings. Although real-world adoption may be limited due to implementation complexity and changing hardware trends, the paper highlights an important systems lesson that optimizing one kernel subsystem in isolation can create significant side effects elsewhere, and that NUMA-awareness is critical for predictable performance on modern architectures.</p>
+<h1 id="references">References</h1>
+<p>[1] A. Panda, A. Panwar, and A. Basu, “nuKSM: NUMA-aware Memory De-duplication on Multi-socket Servers,” <em>Proceedings of the 30th International Conference on Parallel Architectures and Compilation Techniques (PACT)</em>, Oct. 2021, pp. 258–269, doi: 10.1109/PACT52795.2021.00026.</p>
+<h1 id="ai-disclosure">AI Disclosure</h1>
+<ul>
+<li>ChatGPT was used to aid in research and fixing grammatical errors.</li>
+<li>Generative AI can be useful tools for tasks such as summarizing or drafting, however, they may give inaccurate information confidently and should always have generated information validated</li>
+</ul>
+
+  <footer>
+    
+    
+    
+    <p>This is the course blog for CS/ECE 4/599, a research-focused course on memory systems in the School of EECS at Oregon State.
+You can subscribe to <a rel="external" href="https://github.com/khale/mem-systems-w26/blog">posts on the blog</a> with <a rel="external" href="https://github.com/khale/mem-systems-w26/rss.xml">RSS</a>.</p>
+
+  </footer>
+</article>
+
+  </main>
+  <footer>
+    <p><a href="https://www.oregonstate.edu">Oregon State University</a>
+    &mdash;
+    <a href="https://engineering.oregonstate.edu/EECS">School of EECS</a></p>
+  </footer>
+</body>
+</html>

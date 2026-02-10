@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>CS&#x2F;ECE 4&#x2F;599: (MC)^2: Lazy MemCopy at the Memory Controller</title>
+
+  <link href="https://khale.github.io/mem-systems-w26/main.css" rel="stylesheet">
+  <link rel="alternate" type="application/rss+xml" href="https://khale.github.io/mem-systems-w26/rss.xml">
+  <link rel="icon" href="https://khale.github.io/mem-systems-w26/img/favicon.ico">
+  <link rel="apple-touch-icon-precomposed" href="https://khale.github.io/mem-systems-w26/img/favicon152.png">
+  
+<meta name="twitter:card" content="summary">
+<meta property="og:type" content="article">
+<meta property="og:title" content="(MC)^2: Lazy MemCopy at the Memory Controller">
+<meta property="og:description"
+    content="Introduction
+Modern software systems rely heavily on the process of memory copying to provide isolation, simplify synchronization, and support common operations such as serialization, I&#x2F;O buffering, and snapshot creation. Although the system of memcpy appears simple, it holds many operations that impose a significant performance cost; A large portion of the CPU cycles are spent stalled on cache misses and DRAM accesses, in many cases only a small portion of the copied data is ever actually used. As the processor speeds continued to outpace the improvements in memory latency, the inefficiency of eager, byte-by-byte copying becomes a major bottleneck to the entire system.
+The (MC)² Lazy Memcopy style architecture addresses some of these problems. This is done by rethinking where and when the data movement occurs. Instead of immediately copying data at the CPU, (MC)² shifts the copy management into the memory controller and delays the actual data transfer until it is actually needed. By tracking copy intent and resolving it only on demand, (MC)² aims to eliminate redundant memory traffic, reduce cache pollution, and substantially lower the stall time that is associated with the traditional memory copy operation.
+Overview
+(MC)² reduces used to reduced the overall high cost of memory copying by moving the copy management into the memory controller. This is done by making lazy copies. Instead of constantly copying data with memcpy, the system tracks copy intentions using a Copy Tracking table (CTT) and delays the actual movement of bytes, until the data is actually needed for an operation. By only making copies when the destination is read or the source is overwritten. With (MC)² it avoids unnecessary memory traffic and CPU stalls, which are a major bottleneck in modern systems due to cache misses and the long DRAM latencies.
+The use of a memory controller is extended with the hardware structures, including the CTT and a bounce pending queue (BPQ), to transparently intercept copy requests and route memory accesses to the correct location both physically and digitally. This allows for the destination reads to be serviced directly from the source buffer and source writes to trigger on-demand copying. All of this happens while preserving memory consistency and cache coherence. By operating below the cache hierarchy and working on the physical addresses, (MC)² provides fine-grained, cacheline-level copying virtualization, without requiring the operating system or application level changes.
+(MC)² further improves performance by handling chains of copies, merging adjacent regions, and performing background copy completion when tracking resources become saturated. Evaluations that were done across microbenchmarks and real applications such as Protobuf, MongoDB, MVCC databases, and fork-based snapshots showed significant reductions in copy-induced stalls and memory bandwidth consumption, yielding substantial speedups small and partially used buffers that dominate real world workloads.
+Hardware Function and changes
+CPU pushes the copy management into the memory controller for MCLAZY.  So a SRAM based CTT (copy tracking table) and a small queue called BPQ (bounce pending queue) were added.
+CTT functions:">
+
+
+</head>
+<body >
+  <header>
+    <nav>
+      <h1>
+          <a href="https://khale.github.io/mem-systems-w26">CS&#x2F;ECE 4&#x2F;599</a>
+      </h1>
+      
+      
+      
+      <p><a href="https://khale.github.io/mem-systems-w26/schedule/">
+        Schedule
+      </a></p>
+      
+      
+      
+      <p><a href="https://khale.github.io/mem-systems-w26/project-ideas/">
+        Project Ideas
+      </a></p>
+      
+      
+      
+      <p><a href="https://khale.github.io/mem-systems-w26/syllabus/">
+        Syllabus
+      </a></p>
+      
+      
+      
+      <p><a href="https://khale.github.io/mem-systems-w26/extra-reading/">
+        Extra Resources
+      </a></p>
+      
+      
+      
+      <p><a href="https:&#x2F;&#x2F;khale.github.io&#x2F;mem-systems-w26&#x2F;lesson&#x2F;">
+        Lessons
+      </a></p>
+      
+      <p><a href="https://github.com/khale/mem-systems-w26/discussions">Discussions</a></p>
+      
+      
+      <p><a href="https:&#x2F;&#x2F;khale.github.io&#x2F;mem-systems-w26&#x2F;blog&#x2F;">
+        Blog
+      </a></p>
+    </nav>
+  </header>
+  <main>
+    
+
+
+<h1>
+    <a href="https:&#x2F;&#x2F;khale.github.io&#x2F;mem-systems-w26&#x2F;blog&#x2F;">
+    The CS&#x2F;ECE 4&#x2F;599 Course Blog
+    </a>
+</h1>
+<article>
+  <h1>(MC)^2: Lazy MemCopy at the Memory Controller</h1>
+  <p class="details">
+    
+      <span class="author"> by
+      
+         Paul Suvrojyoti (Leader &#x2F; Presentor &#x2F; blogger),
+      
+        Kabir Vidyarthi(Presentor),
+      
+        Derek Werbowy (Presentor),
+      
+        Carlos Alvarado-Lopez (scribe),
+      
+        William Davis(blogger)
+      
+      <span>
+    
+    <time datetime="2026-01-21">
+      January 21, 2026
+    </time>
+  </p>
+  <h1 id="introduction">Introduction</h1>
+<p>Modern software systems rely heavily on the process of memory copying to provide isolation, simplify synchronization, and support common operations such as serialization, I/O buffering, and snapshot creation. Although the system of memcpy appears simple, it holds many operations that impose a significant performance cost; A large portion of the CPU cycles are spent stalled on cache misses and DRAM accesses, in many cases only a small portion of the copied data is ever actually used. As the processor speeds continued to outpace the improvements in memory latency, the inefficiency of eager, byte-by-byte copying becomes a major bottleneck to the entire system.</p>
+<p>The (MC)² Lazy Memcopy style architecture addresses some of these problems. This is done by rethinking where and when the data movement occurs. Instead of immediately copying data at the CPU, (MC)² shifts the copy management into the memory controller and delays the actual data transfer until it is actually needed. By tracking copy intent and resolving it only on demand, (MC)² aims to eliminate redundant memory traffic, reduce cache pollution, and substantially lower the stall time that is associated with the traditional memory copy operation.</p>
+<h1 id="overview">Overview</h1>
+<p>(MC)² reduces used to reduced the overall high cost of memory copying by moving the copy management into the memory controller. This is done by making lazy copies. Instead of constantly copying data with memcpy, the system tracks copy intentions using a Copy Tracking table (CTT) and delays the actual movement of bytes, until the data is actually needed for an operation. By only making copies when the destination is read or the source is overwritten. With (MC)² it avoids unnecessary memory traffic and CPU stalls, which are a major bottleneck in modern systems due to cache misses and the long DRAM latencies.</p>
+<p>The use of a memory controller is extended with the hardware structures, including the CTT and a bounce pending queue (BPQ), to transparently intercept copy requests and route memory accesses to the correct location both physically and digitally. This allows for the destination reads to be serviced directly from the source buffer and source writes to trigger on-demand copying. All of this happens while preserving memory consistency and cache coherence. By operating below the cache hierarchy and working on the physical addresses, (MC)² provides fine-grained, cacheline-level copying virtualization, without requiring the operating system or application level changes.</p>
+<p>(MC)² further improves performance by handling chains of copies, merging adjacent regions, and performing background copy completion when tracking resources become saturated. Evaluations that were done across microbenchmarks and real applications such as Protobuf, MongoDB, MVCC databases, and fork-based snapshots showed significant reductions in copy-induced stalls and memory bandwidth consumption, yielding substantial speedups small and partially used buffers that dominate real world workloads.</p>
+<h1 id="hardware-function-and-changes">Hardware Function and changes</h1>
+<p>CPU pushes the copy management into the memory controller for MCLAZY.  So a SRAM based CTT (copy tracking table) and a small queue called BPQ (bounce pending queue) were added.
+CTT functions:</p>
+<ul>
+<li>merge adjacent tracked regions</li>
+<li>avoid chains like A -&gt;B and B-&gt;C (rewrite to A-&gt;C)</li>
+<li>prevent two rules from overlapping the same dest region</li>
+<li>and free CTT space by completing copies in the background
+BPQ function:
+It just hold the src writes operation until the actual copy to the dest finishes before the writing of the src can proceed.
+Steps of the hardware:</li>
+<li>CPU sends copy instruction</li>
+<li>Cache does src write back so ram has latest src snapshot and invalidates dst so that in later reading dest is not found in cache and it is forced to go to CTT</li>
+<li>MC records the mapping in the CTT
+Later access:
+<ul>
+<li>Src read - proceed normally</li>
+<li>Dest write – proceed normally as it is basically updating the dest  and the mapping in CTT is not even required</li>
+<li>Read from src- not the actual lazy copy needs to go through consulting the CTT. Once done removing the CTT mapping</li>
+<li>Write to src – go to Bpq and let lazy copy of the dest finish first, then proceed.</li>
+</ul>
+</li>
+</ul>
+<h1 id="software-function-and-changes">Software  Function and Changes:</h1>
+<p>(MC)² made some changes to the software side too. It introduced a clean interface ( a wrapper) for lazy copying  “memcpy(dest, src, size)”. Programs use it arbitrary sizes and alignments. The paper states the hardware mechanism is most efficient when it can track is 64 bytes chunks or cacheline sized. The software therefore provides the wrapper that preservers norma copy  but internally chooses between</p>
+<ul>
+<li>
+<p>normal copy for small or awkward pieces</p>
+</li>
+<li>
+<p>Lazy copying fir aligned bulk
+Steps for the new instruction :</p>
+</li>
+<li>
+<p>Do normal copy if too small (smaller than 64 bytes)</p>
+</li>
+<li>
+<p>If dest is not cacheline aligned, compute how many bytes required to make dest aligned , normal copy exactly those bytes, advance src and dest and reduce size accordingly. The remaining region can be handled in cacheline chunks</p>
+</li>
+<li>
+<p>Do the MCLAZY of the bulk region, these are multiples of cacheline sizes and less than a page</p>
+</li>
+<li>
+<p>If something is left , do normal copy.</p>
+</li>
+<li>
+<p>Finally do a fence such that the lazy copy maintains proper order of  memory operations</p>
+</li>
+</ul>
+<p>Example , suppose the program calls memcpy_lazy(dest=…03, src=…00, size=200) and the cacheline is 64 B.</p>
+<p>The wrapper will:</p>
+<ul>
+<li>Copy  61 bytes normally (to align dest)</li>
+<li>Use MCLAZY for the next 128 bytes</li>
+<li>Copy the last 11 bytes normally</li>
+<li>Fence
+There is one last function introduced called MCFREE(buffer, size) which can be sometimes used by software to tell the hardware to drop mappings of dest-&gt;src.</li>
+</ul>
+<h1 id="results">Results:</h1>
+<p>In performance evaluations, (MC)² lazy memcpy outperforms many of the existing systems. The only other system that got close to it in terms of latency is their zIO. For uncached source buffers, the lazy copy system achieves up to 11 times lower latency than the conventional memcpy for medium and large copy sizes over 1 KB, where DRAM is access is the dominate use of time for execution. When the source is already in the cache, the traditional memcpy can be slightly faster for smaller file sizes due to the addition of the memory controller logic in the (MC)² lazy memcpy system. For a different type of access pattern, where the it reads copied data</p>
+<h1 id="key-results">Key Results:</h1>
+<p>Key results:</p>
+<ul>
+<li>11x lower latency for medium and large copy sizes (≥ 1 KB)</li>
+<li>43% speedup for Protobuf serialization</li>
+<li>Mongo DB I/O stack: ~15.5% throughput improvement</li>
+<li>MVCC databases: up to 78% speedup for read-modify-write workloads on small files</li>
+<li>Pipes and streaming I/O: 15 – 30% higher throughput by eliminating redundant kernel buffer copies</li>
+<li>CTT reaches 50% occupancy prevents bandwidth saturation while avoiding CPU stalls.</li>
+</ul>
+<h1 id="class-discussion">Class Discussion</h1>
+<p>The system presents a valuable solution but at what cost?</p>
+<ul>
+<li>The system has many advantages but how much does it cost to manufacture and what are the downsides to this system</li>
+</ul>
+<p>Why hasn’t this been adapted yet?</p>
+<ul>
+<li>The lazy copy system is relatively new to the discussion so it might be used in future CPU’s and memory control systems that have yet to be released as this paper came out in 2024</li>
+</ul>
+<p>Is this a hardware vulnerability?</p>
+<ul>
+<li>As of right now there is nothing to suggest that it is but when future research comes out it might prove that it is a vulnerability. As it could possibly have problems that aren’t discussed in the paper that could cause memory loss or memory overload</li>
+</ul>
+<p>What is the actual cost?</p>
+<ul>
+<li>This is a complete unknown it could be just a slight raise in price or a drastic increase in price due to a new way to make the memory systems requiring new processes to manufacture.</li>
+</ul>
+<h1 id="conclusion">Conclusion</h1>
+<p>In summary, (MC)² lazy memcpy shows that a large portion of the time the system uses is wasted waiting for copying data that is never fully used, with CPU’s stalled waiting on memory rather than doing other useful work. By moving this into the memory controller and making those lazy copies, the system then only has to track copy intent and only moves the data when the data is needed. Hardware support through the copy tracking table and bounce pending Queue enables this to happen in a transparent faction.</p>
+<h1 id="references">References:</h1>
+<ul>
+<li>Paper: https://dl.acm.org/doi/10.1109/ISCA59077.2024.00084</li>
+<li>Slides: https://docs.google.com/presentation/d/1LHGMNmEvYYec-WrcbDhAI9wVA5Bh5tclDccBAJohub0/edit?usp=sharing</li>
+</ul>
+<h1 id="generative-ai-disclosure">Generative AI Disclosure</h1>
+<ul>
+<li>
+<p>ChatCPT was used just to pull notes into 1 file and check grammer</p>
+</li>
+<li>
+<p>Generative AI can be useful tools for tasks such as summarizing or drafting, however, they may give innacurate information confidently and should always have generated information validated</p>
+</li>
+</ul>
+
+  <footer>
+    
+    
+    
+    <p>This is the course blog for CS/ECE 4/599, a research-focused course on memory systems in the School of EECS at Oregon State.
+You can subscribe to <a rel="external" href="https://github.com/khale/mem-systems-w26/blog">posts on the blog</a> with <a rel="external" href="https://github.com/khale/mem-systems-w26/rss.xml">RSS</a>.</p>
+
+  </footer>
+</article>
+
+  </main>
+  <footer>
+    <p><a href="https://www.oregonstate.edu">Oregon State University</a>
+    &mdash;
+    <a href="https://engineering.oregonstate.edu/EECS">School of EECS</a></p>
+  </footer>
+</body>
+</html>
