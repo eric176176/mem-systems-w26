@@ -21,9 +21,10 @@ name = "Adam Bobich"
 +++
 
 # Introduction
-Public cloud providers are constantly balancing the need for top-tier virtual machine (VM) performance with the harsh reality of hardware costs. Main memory (DRAM) accounts for a staggering 50% of the total server cost in modern datacenters. A major culprit behind this expense is "memory stranding." This phenomenon occurs when all CPU cores on a server are rented out to customers, leaving the remaining unallocated memory completely unusable by other systems. At the 95th percentile of server utilization, up to 25% of memory can become stranded.
-
-Memory pooling via the Compute Express Link (CXL) standard offers a solution by disaggregating memory, but CXL comes with higher access latencies (adding 70-90ns) that can severely degrade the performance of latency-sensitive workloads. "Pond" is a full-stack memory pooling system designed to pool this stranded and untouched memory efficiently without sacrificing performance at scale.
+Public cloud providers are constantly balancing the need for top-tier virtual machine (VM) performance with the harsh reality of hardware costs. Main memory (DRAM) accounts for a staggering 50% of the total server cost in modern datacenters. A major culprit behind this expense is "memory stranding." This phenomenon occurs when all CPU cores on a server are rented out to customers, leaving the remaining unallocated memory completely unusable by other systems. 
+- At the 75th percentile, 6% of memory is stranded
+- At the 85th percentile, 10% of memory is stranded
+- At the 95th percentile of server utilization, up to 25% of memory can become stranded.
 
 Additionally, due to overprovisioning by customers, nearly half of all rented VM memory goes untouched. While memory pooling via the Compute Express Link (CXL) standard allows load/store access without the heavy page-fault overheads of RDMA, it adds roughly 70-90ns of latency essentially doubling the access time compared to local DRAM. Because 60% of cloud workloads experience more than a 5% slowdown under CXL latencies, naive pooling is impossible. Pond is designed to pool this stranded and untouched memory intelligently, maintaining strict cloud performance standards.
 
@@ -55,7 +56,7 @@ Pond's evaluation yielded several compelling findings
 By pooling memory across 8-16 sockets, Pond achieved a 7-9% reduction in overall DRAM requirements, which translates to a massive 3.5% reduction in total cloud hardware costs. Larger pool sizes provided diminishing returns and incurred higher latency penalties. In contrants, scaling up to 64 sockets yeilded 13% savings but doing so required CXL switches that pushed access latencies byeond 270ns.
 
 ## Performance
-The ML prediction model successfully identified 25% of untouched memory across the fleet while only overpredicting for 4% of VMs.
+The ML prediction model achieves 7-9% saving by pooling by successfully identifying 25% of untouched memory across the fleet while only overpredicting for 4% of VMs.
 
 ## zNUMA Effectiveness
 The zNUMA abstraction worked exceptionally well. Workloads correctly predicted to have untouched memory sent less than 0.38% of their memory traffic to the slower CXL pool, virtually eliminating any latency penalties.
@@ -79,3 +80,4 @@ Pond represents a major step forward in cloud infrastructure, demonstrating that
 
 # AI Disclosure
 - Gemini to help summarize paper and scribe notes
+
