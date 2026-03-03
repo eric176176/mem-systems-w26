@@ -92,7 +92,7 @@ blog_link = "../blog/an-empirical-guide-to-the-behavior-and-use-of-scalable-pers
 
 [[classes]]
 lesson = 13
-title = "Serverless"
+#title = "Serverless"
 leader = "Lab 2: James Tappert"
 readings = ["memento"]
 paper_slides = "https://canvas.oregonstate.edu/courses/2028992/files/116618804?module_item_id=26535280"
@@ -104,6 +104,7 @@ title = "Memory Disaggregation"
 leader = "Lab 3: Eric Morgan-Bronec"
 readings = ["disagg"]
 paper_slides = "https://canvas.oregonstate.edu/courses/2028992/files/116679443?module_item_id=26544168"
+blog_link = "../blog/disaggregated-memory-for-expansion-and-sharing-in-blade-servers"
 
 [[classes]]
 lesson = 15
