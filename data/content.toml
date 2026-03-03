@@ -100,7 +100,7 @@ blog_link = "../blog/memento"
 
 [[classes]]
 lesson = 14
-title = "Memory Disaggregation"
+#title = "Memory Disaggregation"
 leader = "Lab 3: Eric Morgan-Bronec"
 readings = ["disagg"]
 paper_slides = "https://canvas.oregonstate.edu/courses/2028992/files/116679443?module_item_id=26544168"
