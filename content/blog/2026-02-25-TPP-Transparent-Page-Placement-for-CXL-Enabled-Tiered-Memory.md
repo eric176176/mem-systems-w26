@@ -7,6 +7,8 @@ name = "Deptmer Ashley (Blogger)"
 name = "Jared Ho (Leader/Presenter)" 
 [[extra.authors]]
 name = "Brian Castellon Rosales (Leader/Presenter)"
+[[extra.authors]]
+name = "John Aebi (Scribe)"
 +++
 
 ## Purpose
