@@ -1,13 +1,13 @@
 +++
 title = "FPGA Backed Far Memory with Hardware Managed Tiering and In Tier COPY/ZERO"
 [[extra.authors]]
-name = "Adam Bobich"
-[[extra.authors]]
-name = "William Davis" 
+name = "Suvrojyoti Paul"
 [[extra.authors]]
 name = "Carlos Alvarado Lopez"
 [[extra.authors]]
-name = "Suvrojyoti Paul"
+name = "Adam Bobich"
+[[extra.authors]]
+name = "William Davis" 
 [[extra.authors]]
 name = "Allen Lee"
 +++
