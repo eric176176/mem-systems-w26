@@ -3,11 +3,11 @@ title = "Hardware-Based CPU-Transparent Memory-Tiering Controller Implemented on
 [extra]
 bio = """ """
 [[extra.authors]]
-name = "Thomas Pinon (Platform Achitechture)"
+name = "Thomas Pinon"
 [[extra.authors]]
-name = "Donovan Burk (Controller Design)"
+name = "Donovan Burk"
 [[extra.authors]]
-name = "Eric Morgan-Bronec (Benchmarking)"
+name = "Eric Morgan-Bronec"
 +++
 
 # Project Goal
@@ -26,17 +26,17 @@ For the actual memory controller, we made a custom design instead of just using 
 
 # Benchmarking and Results.
 ## Benchmark
-We evaluated our Tiering Controller using a workload based on the STREAM benchmark. STREAM is used to test memory bandwidth and computation time for simple vector operations. Stream uses three arrays A, B, and C as well four vector operations to measure performance.
-- Copy: evey element from B to A.
+We evaluated our Tiering Controller using a workload based on the STREAM benchmark. STREAM is used to test memory bandwidth and computation time for simple vector operations. STREAM uses three arrays A, B, and C as well as four vector operations to measure performance.
+- Copy: every element from B to A.
 - Scale: Scales every element in B and stores it in A.
 - ADD: Adds B and C together and stores the sum in A.
 - Triad: Scales C, adds it to B, then stores the result in A.
-It does this for ten iterations and measures the average number of cycles. the total size of the arrays is 64Kb which is enough to overflow into the far Tier of memory.
-
+It does this for ten iterations and measures the average number of cycles. The total size of the arrays is 64 KB, which is enough to overflow into the far tier of memory.
 ## Results
-We ran this on two platforms. We first ran it on an platoform that only had the fast tier of memory to get a baseline performance of our system. We then ran it on with tiering controller and measured the percentage slowdown. We measured the latency of the slow tier to be about 2.3x slower than the fast tier. This was verified by accesing memory in each section and measuring the latency in clock cycles with an AXI bus timer.
+We ran this on two platforms. We first ran it on a platform that only had the fast tier of memory to get a baseline performance of our system. We then ran it in a configuration with just fast memory and then with the tiering controller and measured the percentage slowdown. We measured the latency of the slow tier to be about 2.3× slower than the fast tier. This was verified by accessing memory in each section and measuring the latency in clock cycles with an AXI bus timer.
 
 ![Results](./benchmark.png)
+
 ### Latency Compared to Baseline
 - Copy: 1.28x
 - Scale: 1.22x
@@ -44,7 +44,9 @@ We ran this on two platforms. We first ran it on an platoform that only had the 
 - Triad: 1.26x
 - Total: 1.27x
 
- The results show that the controller sucessfully managed both the near and far tiers of memory and preformed close to the baseline with fast memory. If we were not using Tiering and just had the near and far memory togehter with not Tiering algorithm we should get a slowdown of 1/2 + 2.33/2 = 1.67X. a slowdown of 1.27X shows that our controller is not only allocating memory but placing hot pages in the fast memory and cold pages in the slow memory.
+The results show that the controller successfully managed both the near and far tiers of memory and performed close to the baseline with fast memory. If we were not using tiering and just had the near and far memory together, we should get a slowdown of 1/2 + 2.33/2 = 1.67×. A slowdown of 1.27× shows that our controller is not only allocating memory but placing hot pages in the fast memory and cold pages in the slow memory.
+
+In the future, we could run more benchmarks that take advantage of temporal and spatial locality to test our controller’s logic even further. The STREAM benchmark served as an initial test for our controller, but it would be interesting to see how it performs under different workloads
 
 # Challenges
 Some of the most significant challenges just involved working with the Xilinx/AMD tools (Vivado and Vitis). They were pretty unintuitive at times. One of the largest struggles in the beginning was getting the first AXI4 IP (the latency injector) properly packaged. Once you have the RTL implementation of your design, you must run it through Vivado's AXI IP packager, which configures interfaces properly so that the block can be integrated into a top-level block design and interact with the other AXI IPs correctly. For a while, we were sure we had the latency injector logic designed correctly, but our tests were consistently showing that both AXI BRAMs were being accessed with the same latency. This meant that our latency injector was being bypassed, but we weren't sure why. It turned out to be a memory mapping issue. In the IP packager, we had misconfigured the memory mapping of the input and output AXI interfaces in a few important ways. Even though the top-level memory map looked correct, the latency injector IP was not properly configured to route the input interface through the logic to the output interface. Another challenge was debugging.
@@ -58,7 +60,13 @@ Although learning how AXI worked was difficult for a first time looking at it. O
 # Project Deliverables
 https://github.com/MemoryTiering/tmc
 
+# Contributions
+Thomas Pinon was responsible for setting up the AMD Microblze processor on the FPGA as well as implementing the Near and Far Memory Tiers on the FPGA.
+
+Donovan Burk was responsible for Design of the Memory controller logic and implementing it on the FPGA.
+
+Eric Morgan-Bronec was responsible for creating a Benchmark for the project and analysing the results.
 
 ## Generative AI disclosure
 Google Gemini 3 pro was used in developing the achitechture.
-Chat GPT was used in the process of creating parts of the controller as well as debugging Benchmarking code.
+Chat GPT was used in the process of creating parts of the controller as well as debugging Benchmarking code. It was also used for grammer and spelling check.
